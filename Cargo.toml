@@ -1,0 +1,5 @@
+[workspace]
+members = [
+    "smartcontracts/programs/amm",
+    "smartcontracts/programs/create_token"
+]
