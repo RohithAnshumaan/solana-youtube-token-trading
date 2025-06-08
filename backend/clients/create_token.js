@@ -25,7 +25,7 @@ import Token from '../src/models/token.js';
 
 const execPromise = promisify(exec);
 
-const PROGRAM_ID = new PublicKey('47cnMpkLW2hF88pCcofNE43pYigG7zyKSWrWp76L6ziP');
+const PROGRAM_ID = new PublicKey('3ejw4uLZK7wqtUEmmbWDgipFABnL8SsT6qjFEcYvebmU');
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 class YouTubeTokenFactory {
@@ -43,7 +43,7 @@ class YouTubeTokenFactory {
       const cleanHandle = channelHandle.startsWith('@') ? channelHandle.slice(1) : channelHandle;
 
       // Execute Python script with channel handle as argument
-      const { stdout, stderr } = await execPromise(`python D:\\HypeEconomy\\backend\\utils\\fetchmetrics.py ${cleanHandle}`);
+      const { stdout, stderr } = await execPromise(`python D:\\HypeEconomy\\backend\\utils\\fetch_metrics.py ${cleanHandle}`);
 
       if (stderr) {
         console.error('Python script error:', stderr);
@@ -342,29 +342,7 @@ class YouTubeTokenFactory {
     const tokenSupply = this.calculateTokenSupply(channelMetrics);
     const tokenPrice = this.calculateInitialPrice(channelMetrics);
     
-    // Calculate market cap in SOL
-    const marketCap = tokenSupply * tokenPrice;
-    
-    // Liquidity should be 5-15% of market cap for good price stability
-    // Higher percentage for smaller caps, lower for larger caps
-    const marketCapSOL = marketCap;
-    let liquidityPercentage;
-    
-    if (marketCapSOL < 100) {
-      liquidityPercentage = 0.15; // 15% for small caps
-    } else if (marketCapSOL < 1000) {
-      liquidityPercentage = 0.10; // 10% for medium caps
-    } else {
-      liquidityPercentage = 0.05; // 5% for large caps
-    }
-    
-    let solAmount = marketCapSOL * liquidityPercentage;
-    
-    // Apply minimum and maximum bounds
-    const minSol = 10;      // Minimum 10 SOL
-    const maxSol = 200000;  // Maximum 200K SOL as requested
-    
-    solAmount = Math.max(Math.min(solAmount, maxSol), minSol);
+    let solAmount = tokenSupply * tokenPrice;
     
     return Math.round(solAmount * 1000000) / 1000000;
   }
@@ -378,7 +356,7 @@ async function main() {
   await connection.confirmTransaction(signature);
   const factory = new YouTubeTokenFactory(connection, payer);
 
-  const channelHandle = '@UnqGaming4K'; // Example channel handle
+  const channelHandle = '@rohithanshumaan3550'; // Example channel handle
   try {
     const result = await factory.createChannelToken(channelHandle);
     console.log('Token creation result:', result);

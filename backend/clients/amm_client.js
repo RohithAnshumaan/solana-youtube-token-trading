@@ -25,7 +25,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'youtube_tokens';
 const COLLECTION_NAME = 'tokens';
 
-const PROGRAM_ID = new PublicKey('A5GFnTsTpXUSyBBdRQcuZV9bjsxcX3ewqZXinCiLokMV');
+const PROGRAM_ID = new PublicKey('9pKDtt6qeSmkbYu4Jhh65Gg5EsmcrBwdJFL1fbzFZtVJ');
 const RPC_URL = 'http://127.0.0.1:8899';
 const connection = new Connection(RPC_URL, 'confirmed');
 const DEFAULT_WALLET_PUBKEY = new PublicKey('4Vd2tqPNX4tQjsQXTz4cAqdrwrSLFhrwjHsKfjo2cvQX');
@@ -38,7 +38,7 @@ async function fetchTokenData() {
     const collection = db.collection(COLLECTION_NAME);
 
     const token = await collection.findOne(
-      { channel_name: "Unq Gaming" },
+      { channel_name: "PewDiePie" },
       { sort: { _id: -1 } }
     );
 
@@ -155,32 +155,25 @@ class AMMClient {
 
     await this.ensureSufficientBalance(solAmount + 2);
 
-    const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
-
     const solBalance = await this.connection.getBalance(this.defaultWallet.publicKey);
     console.log(`Default wallet SOL balance: ${solBalance / LAMPORTS_PER_SOL} SOL`);
 
-    const poolKeypair = new Keypair();
-    const poolAccountSize = 113;
-    const rentExemption = await this.connection.getMinimumBalanceForRentExemption(poolAccountSize);
+    const WSOL_MINT = new PublicKey('So11111111111111111111111111111111111111112');
 
-    console.log(`Creating pool account: ${poolKeypair.publicKey.toBase58()}`);
-    const createPoolAccountTx = new Transaction().add(
-      SystemProgram.createAccount({
-        fromPubkey: this.defaultWallet.publicKey,
-        newAccountPubkey: poolKeypair.publicKey,
-        lamports: rentExemption,
-        space: poolAccountSize,
-        programId: PROGRAM_ID,
-      })
+    const [poolPDA, bump] = await PublicKey.findProgramAddress(
+      [Buffer.from("amm"), new PublicKey(tokenMint).toBuffer(), WSOL_MINT.toBuffer()],
+      PROGRAM_ID
     );
-    await sendAndConfirmTransaction(this.connection, createPoolAccountTx, [this.defaultWallet, poolKeypair]);
 
+    console.log(`Pool PDA: ${poolPDA.toBase58()}, Bump: ${bump}`);
+    
+    console.log("Token mint = ", tokenMint);
+    
     const poolTokenAccount = await getOrCreateAssociatedTokenAccount(
-      this.connection,
+    this.connection,
       this.defaultWallet,
       new PublicKey(tokenMint),
-      poolKeypair.publicKey,
+      poolPDA,
       true
     );
     console.log(`Pool YT_TOKEN account: ${poolTokenAccount.address.toBase58()}`);
@@ -189,7 +182,7 @@ class AMMClient {
       this.connection,
       this.defaultWallet,
       WSOL_MINT,
-      poolKeypair.publicKey,
+      poolPDA,
       true
     );
     console.log(`Pool WSOL account: ${poolSolAccount.address.toBase58()}`);
@@ -251,25 +244,6 @@ class AMMClient {
     new PublicKey(tokenMint).toBuffer().copy(initData, 1);
     WSOL_MINT.toBuffer().copy(initData, 33);
 
-    const initInstruction = new TransactionInstruction({
-      programId: PROGRAM_ID,
-      keys: [
-        { pubkey: this.defaultWallet.publicKey, isSigner: true, isWritable: false },
-        { pubkey: poolKeypair.publicKey, isSigner: false, isWritable: true },
-        { pubkey: poolTokenAccount.address, isSigner: false, isWritable: true },
-        { pubkey: poolSolAccount.address, isSigner: false, isWritable: true },
-        { pubkey: this.tokenSourceWallet.publicKey, isSigner: true, isWritable: false },
-        { pubkey: this.defaultWallet.publicKey, isSigner: true, isWritable: false },
-        { pubkey: poolTokenAccount.address, isSigner: false, isWritable: false },
-        { pubkey: poolSolAccount.address, isSigner: false, isWritable: false },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      ],
-      data: initData,
-    });
-
-    console.log("Sending pool initialization transaction...");
-    await sendAndConfirmTransaction(this.connection, new Transaction().add(initInstruction), [this.defaultWallet, this.tokenSourceWallet]);
-
     const sourceTokenAccount = await getOrCreateAssociatedTokenAccount(
       this.connection,
       this.tokenSourceWallet,
@@ -278,6 +252,41 @@ class AMMClient {
       false
     );
     console.log(`User YT_TOKEN account: ${sourceTokenAccount.address.toBase58()}`);
+
+    console.log("TOKEN_PROGRAM_ID on client:", TOKEN_PROGRAM_ID.toBase58());
+
+    const initInstruction = new TransactionInstruction({
+      programId: PROGRAM_ID,
+      keys: [
+        { pubkey: this.defaultWallet.publicKey, isSigner: true, isWritable: true }, // user_account
+        { pubkey: poolPDA, isSigner: false, isWritable: true }, // pool_account
+        { pubkey: poolTokenAccount.address, isSigner: false, isWritable: true }, // token_a_account
+        { pubkey: poolSolAccount.address, isSigner: false, isWritable: true }, // token_b_account
+        { pubkey: this.defaultWallet.publicKey, isSigner: true, isWritable: false }, // user_token_a_authority
+        { pubkey: this.defaultWallet.publicKey, isSigner: true, isWritable: false }, // user_token_b_authority
+        { pubkey: sourceTokenAccount.address, isSigner: false, isWritable: true }, // user_token_a_account
+        { pubkey: userSolAccount.address, isSigner: false, isWritable: true }, // user_token_b_account
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
+      ],
+
+      data: initData,
+    });
+
+    // Simulate the transaction before sending it
+    const first_simulation = await connection.simulateTransaction(
+      new Transaction().add(initInstruction),
+      [this.defaultWallet]
+    );
+    console.log("Simulation logs:", first_simulation.value.logs);
+
+
+    console.log("Sending pool initialization transaction...");
+    await sendAndConfirmTransaction(
+      this.connection,
+      new Transaction().add(initInstruction),
+      [this.defaultWallet]
+    );
 
     const tokenBalance = await this.connection.getTokenAccountBalance(sourceTokenAccount.address);
     console.log(`User YT_TOKEN balance: ${tokenBalance.value.uiAmount}`);
@@ -303,7 +312,7 @@ class AMMClient {
       programId: PROGRAM_ID,
       keys: [
         { pubkey: this.defaultWallet.publicKey, isSigner: true, isWritable: false },
-        { pubkey: poolKeypair.publicKey, isSigner: false, isWritable: true },
+        { pubkey: poolPDA, isSigner: false, isWritable: true },
         { pubkey: poolTokenAccount.address, isSigner: false, isWritable: true },
         { pubkey: poolSolAccount.address, isSigner: false, isWritable: true },
         { pubkey: this.tokenSourceWallet.publicKey, isSigner: true, isWritable: false },
@@ -311,6 +320,7 @@ class AMMClient {
         { pubkey: sourceTokenAccount.address, isSigner: false, isWritable: true },
         { pubkey: userSolAccount.address, isSigner: false, isWritable: true },
         { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }
       ],
       data: liquidityData,
     });
@@ -339,13 +349,13 @@ class AMMClient {
     }
 
     const poolData = {
-      poolAccount: poolKeypair.publicKey,
+      poolAccount: poolPDA,
       poolTokenAccount: poolTokenAccount.address,
       poolSolAccount: poolSolAccount.address,
     };
 
     // Store pool data in MongoDB
-    await storePoolData("Unq Gaming", poolData);
+    await storePoolData("PewDiePie", poolData);
 
     return poolData;
   }

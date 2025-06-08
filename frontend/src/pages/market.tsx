@@ -7,6 +7,7 @@ import TokenCard, { TokenCardContent } from "@/components/ui/tokenCard";
 
 interface Token {
   _id: string;
+  channel_handle: string,
   token_symbol: string;
   thumbnail_url: string;
   initial_price: number;
