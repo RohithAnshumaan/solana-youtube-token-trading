@@ -20,13 +20,12 @@ import BN from 'bn.js';
 import { MongoClient } from 'mongodb';
 import dotenv from 'dotenv';
 dotenv.config({ path: './backend/.env' });
-import Token from '../src/models/token.js';
 
 
 // MongoDB setup
 const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'youtube_tokens';
-const COLLECTION_NAME = 'tokens';
+const COLLECTION_NAME = 'users';
 
 const PROGRAM_ID = new PublicKey('9pKDtt6qeSmkbYu4Jhh65Gg5EsmcrBwdJFL1fbzFZtVJ');
 const RPC_URL = process.env.SOLANA_RPC_URL;
@@ -70,15 +69,16 @@ async function fetchTokenAndPoolData() {
     }
 }
 
-async function storeSwapData(channelName, swapData) {
+async function storeSwapData(swapData, userEmail) {
     const client = new MongoClient(MONGO_URI);
     try {
         await client.connect();
         const db = client.db(DB_NAME);
-        const collection = db.collection(COLLECTION_NAME);
 
-        const result = await collection.updateOne(
-            { channel_name: channelName },
+        // Update users collection (assuming separate collection 'users')
+        const usersCollection = db.collection('users');
+        await usersCollection.updateOne(
+            { email: userEmail },
             {
                 $push: {
                     swap_history: {
@@ -86,7 +86,7 @@ async function storeSwapData(channelName, swapData) {
                         swap_type: swapData.swapType,
                         amount_in: swapData.amountIn,
                         amount_out: swapData.amountOut,
-                        user_wallet: swapData.userWallet,
+                        token: channelName, // optionally log which token was swapped
                         timestamp: new Date()
                     }
                 }
@@ -94,7 +94,7 @@ async function storeSwapData(channelName, swapData) {
             { upsert: true }
         );
 
-        console.log(`Stored swap data for ${channelName}:`, result);
+        console.log(`Stored swap data for ${channelName} and user ${userEmail}`);
     } catch (error) {
         console.error('Failed to store swap data:', error);
         throw error;
@@ -102,6 +102,7 @@ async function storeSwapData(channelName, swapData) {
         await client.close();
     }
 }
+
 
 class AMMSwapClient {
     constructor(defaultWalletKeypair, userWalletKeypair, userWalletPubkey) {
@@ -115,6 +116,7 @@ class AMMSwapClient {
         this.userWallet = userWalletKeypair;
         this.userWalletPubkey = userWalletPubkey;
         this.connection = connection;
+        this.currentUserEmail = currentUserEmail;
     }
 
     async ensureSufficientBalance(requiredSol = 1) {
@@ -297,7 +299,7 @@ class AMMSwapClient {
         };
 
         // Store swap data
-        await storeSwapData("PewDiePie", swapResult);
+        await storeSwapData(swapResult, this.currentUserEmail);
 
         return swapResult;
     }
@@ -457,7 +459,7 @@ class AMMSwapClient {
         };
 
         // Store swap data
-        await storeSwapData("PewDiePie", swapResult);
+        await storeSwapData(swapResult, this.currentUserEmail);
 
         return swapResult;
     }
@@ -483,7 +485,7 @@ async function main() {
         const defaultWallet = loadDefaultWallet();
         const userWallet = loadUserWallet("10,249,147,156,185,50,67,46,250,33,151,239,222,11,136,197,198,134,105,122,172,81,65,224,69,96,164,80,52,2,191,231,151,214,132,50,155,150,196,131,122,141,128,123,119,77,86,225,14,33,225,136,123,183,84,52,143,36,75,48,60,16,212,253");
 
-        const swapClient = new AMMSwapClient(defaultWallet, userWallet, USER_WALLET_PUBKEY);
+        const swapClient = new AMMSwapClient(defaultWallet, userWallet, USER_WALLET_PUBKEY, req.user.email) ;
 
         console.log("\n=== Executing SOL to Token Swap ===");
         const solToTokenResult = await swapClient.swapSolForTokens(poolData, 10);

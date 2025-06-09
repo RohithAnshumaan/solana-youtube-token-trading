@@ -356,7 +356,7 @@ async function main() {
   await connection.confirmTransaction(signature);
   const factory = new YouTubeTokenFactory(connection, payer);
 
-  const channelHandle = '@rohithanshumaan3550'; // Example channel handle
+  const channelHandle = '@jainisaiabhiram9469'; // Example channel handle
   try {
     const result = await factory.createChannelToken(channelHandle);
     console.log('Token creation result:', result);
