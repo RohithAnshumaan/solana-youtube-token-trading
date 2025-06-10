@@ -32,7 +32,7 @@ const RPC_URL = process.env.SOLANA_RPC_URL;
 const connection = new Connection(RPC_URL, 'confirmed');
 const DEFAULT_WALLET_PUBKEY = new PublicKey('4Vd2tqPNX4tQjsQXTz4cAqdrwrSLFhrwjHsKfjo2cvQX');
 
-async function fetchTokenAndPoolData() {
+async function fetchTokenAndPoolData(channelName) {
     const client = new MongoClient(MONGO_URI);
     try {
         await client.connect();
@@ -40,19 +40,20 @@ async function fetchTokenAndPoolData() {
         const collection = db.collection(COLLECTION_NAME);
 
         const token = await collection.findOne(
-            { channel_name: "PewDiePie" },
+            { channel_name: channelName },
             { sort: { _id: -1 } }
         );
 
         if (!token) {
-            throw new Error('No token found in the database for PewDiePie');
+            throw new Error(`No token found in the database for ${channelName}`);
         }
 
         if (!token.liquidity_pool) {
-            throw new Error('No liquidity pool data found for this token');
+            throw new Error(`No liquidity pool data found for this token: ${channelName}`);
         }
 
         return {
+            token_symbol: token.token_symbol,
             payer_public: token.payer_public,
             payer_secret: token.payer_secret,
             mint_address: token.mint_address,
@@ -68,41 +69,6 @@ async function fetchTokenAndPoolData() {
         await client.close();
     }
 }
-
-async function storeSwapData(swapData, userEmail) {
-    const client = new MongoClient(MONGO_URI);
-    try {
-        await client.connect();
-        const db = client.db(DB_NAME);
-
-        // Update users collection (assuming separate collection 'users')
-        const usersCollection = db.collection('users');
-        await usersCollection.updateOne(
-            { email: userEmail },
-            {
-                $push: {
-                    swap_history: {
-                        transaction_signature: swapData.txSignature,
-                        swap_type: swapData.swapType,
-                        amount_in: swapData.amountIn,
-                        amount_out: swapData.amountOut,
-                        token: channelName, // optionally log which token was swapped
-                        timestamp: new Date()
-                    }
-                }
-            },
-            { upsert: true }
-        );
-
-        console.log(`Stored swap data for ${channelName} and user ${userEmail}`);
-    } catch (error) {
-        console.error('Failed to store swap data:', error);
-        throw error;
-    } finally {
-        await client.close();
-    }
-}
-
 
 class AMMSwapClient {
     constructor(defaultWalletKeypair, userWalletKeypair, userWalletPubkey) {
@@ -298,9 +264,6 @@ class AMMSwapClient {
             userWallet: this.userWallet.publicKey.toBase58()
         };
 
-        // Store swap data
-        await storeSwapData(swapResult, this.currentUserEmail);
-
         return swapResult;
     }
 
@@ -458,9 +421,6 @@ class AMMSwapClient {
             userWallet: this.userWallet.publicKey.toBase58()
         };
 
-        // Store swap data
-        await storeSwapData(swapResult, this.currentUserEmail);
-
         return swapResult;
     }
 }
@@ -475,33 +435,6 @@ function loadUserWallet(payerSecret) {
     const secretKey = Uint8Array.from(secretKeyArray);
     return Keypair.fromSecretKey(secretKey);
 }
-
-async function main() {
-    try {
-        const poolData = await fetchTokenAndPoolData();
-        console.log(`Fetched pool data:`, poolData);
-
-        const USER_WALLET_PUBKEY = new PublicKey("BDiHLp2JHuhtg81tM9ep8q9kCSJCTyzKWrAwQdWg7yhE");
-        const defaultWallet = loadDefaultWallet();
-        const userWallet = loadUserWallet("10,249,147,156,185,50,67,46,250,33,151,239,222,11,136,197,198,134,105,122,172,81,65,224,69,96,164,80,52,2,191,231,151,214,132,50,155,150,196,131,122,141,128,123,119,77,86,225,14,33,225,136,123,183,84,52,143,36,75,48,60,16,212,253");
-
-        const swapClient = new AMMSwapClient(defaultWallet, userWallet, USER_WALLET_PUBKEY, req.user.email) ;
-
-        console.log("\n=== Executing SOL to Token Swap ===");
-        const solToTokenResult = await swapClient.swapSolForTokens(poolData, 10);
-        console.log("Swap Result:", solToTokenResult);
-
-        // console.log("\n=== Executing Token to SOL Swap ===");
-        // const tokenToSolResult = await swapClient.swapTokensForSol(poolData, 0.983840364);
-        // console.log("Swap Result:", tokenToSolResult);
-    } catch (error) {
-        console.error('Error in main function:', error);
-        throw error;
-    }
-}
-
-// Uncomment to run the main function
-main().catch(console.error);
 
 // Export for use in other modules
 export { AMMSwapClient, fetchTokenAndPoolData, loadDefaultWallet, loadUserWallet };

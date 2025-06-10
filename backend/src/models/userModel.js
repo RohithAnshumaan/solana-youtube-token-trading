@@ -17,6 +17,26 @@ const userSchema = new mongoose.Schema({
   solWalletSecretKey: String,
   solBalance: Number,
   wallets: [walletSchema],
+  depositHistory: [{
+    amount: { type: Number, required: true },
+    signature: { type: String, required: true },
+    balanceAfter: { type: Number, required: true },
+    timestamp: { type: Date, default: Date.now },
+  }],
+  createdTokens: [
+  {
+    token_title: String,
+    token_symbol: String,
+    token_title: String,
+    thumbnail_url: String,
+    initial_price: Number,
+    pool_supply: Number,
+    pool_sol: Number,
+    market_cap: Number,
+    created_at: { type: Date, default: Date.now }
+  }
+]
+
 });
 
 const User = mongoose.model("User", userSchema);

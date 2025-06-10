@@ -30,7 +30,7 @@ const RPC_URL = 'http://127.0.0.1:8899';
 const connection = new Connection(RPC_URL, 'confirmed');
 const DEFAULT_WALLET_PUBKEY = new PublicKey('4Vd2tqPNX4tQjsQXTz4cAqdrwrSLFhrwjHsKfjo2cvQX');
 
-async function fetchTokenData() {
+async function fetchTokenData(channelName) {
   const client = new MongoClient(MONGO_URI);
   try {
     await client.connect();
@@ -38,12 +38,12 @@ async function fetchTokenData() {
     const collection = db.collection(COLLECTION_NAME);
 
     const token = await collection.findOne(
-      { channel_name: "PewDiePie" },
+      { channel_name: channelName },
       { sort: { _id: -1 } }
     );
 
     if (!token) {
-      throw new Error('No token found in the database for Eric Rosen Extra');
+      throw new Error(`No token found in the database for ${channelName}`);
     }
 
     if (isNaN(token.pool_supply) || isNaN(token.pool_sol)) {
@@ -61,6 +61,7 @@ async function fetchTokenData() {
     await client.close();
   }
 }
+
 
 async function storePoolData(channelName, poolData) {
   const client = new MongoClient(MONGO_URI);
@@ -166,11 +167,11 @@ class AMMClient {
     );
 
     console.log(`Pool PDA: ${poolPDA.toBase58()}, Bump: ${bump}`);
-    
+
     console.log("Token mint = ", tokenMint);
-    
+
     const poolTokenAccount = await getOrCreateAssociatedTokenAccount(
-    this.connection,
+      this.connection,
       this.defaultWallet,
       new PublicKey(tokenMint),
       poolPDA,
@@ -354,9 +355,6 @@ class AMMClient {
       poolSolAccount: poolSolAccount.address,
     };
 
-    // Store pool data in MongoDB
-    await storePoolData("PewDiePie", poolData);
-
     return poolData;
   }
 }
@@ -372,20 +370,10 @@ function loadTokenSourceWallet(payerSecret) {
   return Keypair.fromSecretKey(secretKey);
 }
 
-async function main() {
-  const tokenData = await fetchTokenData();
-  console.log(`Fetched token data:`, tokenData);
-  const TOKEN_SOURCE_WALLET_PUBKEY = new PublicKey(tokenData.payer_public);
-  const required_sol = tokenData.pool_sol;
-  const defaultWallet = loadDefaultWallet();
-  const tokenSourceWallet = loadTokenSourceWallet(tokenData.payer_secret);
-  const ammClient = new AMMClient(defaultWallet, tokenSourceWallet, TOKEN_SOURCE_WALLET_PUBKEY, required_sol);
-
-  await ammClient.createPool(
-    tokenData.mint_address,
-    tokenData.pool_supply,
-    tokenData.pool_sol
-  );
-}
-
-main().catch(console.error);
+export {
+  AMMClient,
+  fetchTokenData,
+  storePoolData,
+  loadDefaultWallet,
+  loadTokenSourceWallet
+};

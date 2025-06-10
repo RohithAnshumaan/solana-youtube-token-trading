@@ -5,7 +5,7 @@ import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { TrendingUp, Zap, Shield } from "lucide-react"
-import { Link } from "react-router-dom"
+import {Link}from "react-router-dom"
 
 export default function HomePage() {
   const [isLoaded, setIsLoaded] = useState(false)

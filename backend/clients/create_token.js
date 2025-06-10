@@ -1,11 +1,8 @@
 import {
-  Connection,
   Keypair,
   PublicKey,
   SystemProgram,
   Transaction,
-  sendAndConfirmTransaction,
-  LAMPORTS_PER_SOL,
   SYSVAR_RENT_PUBKEY,
 } from '@solana/web3.js';
 
@@ -20,8 +17,6 @@ import {
 import * as borsh from 'borsh';
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import connectDB from '../utils/db.js';
-import Token from '../src/models/token.js';
 
 const execPromise = promisify(exec);
 
@@ -348,54 +343,4 @@ class YouTubeTokenFactory {
   }
 }
 
-async function main() {
-  const connection = new Connection('http://localhost:8899', 'confirmed');
-  await connectDB();
-  const payer = Keypair.generate();
-  const signature = await connection.requestAirdrop(payer.publicKey, 2 * LAMPORTS_PER_SOL);
-  await connection.confirmTransaction(signature);
-  const factory = new YouTubeTokenFactory(connection, payer);
-
-  const channelHandle = '@jainisaiabhiram9469'; // Example channel handle
-  try {
-    const result = await factory.createChannelToken(channelHandle);
-    console.log('Token creation result:', result);
-
-    const price = factory.calculateInitialPrice(result.channelMetrics);
-    const supply = factory.calculateTokenSupply(result.channelMetrics);
-    const initialSol = factory.calculateInitialSol(result.channelMetrics);
-
-    console.log(`\nToken Economics:`);
-    console.log(`Initial Price: ${price} SOL`);
-    console.log(`Initial Supply: ${supply.toLocaleString()} tokens`);
-    console.log(`Initial SOL Required: ${initialSol} SOL`);
-    console.log(`Market Cap: ${(price * supply).toFixed(2)} SOL`);
-
-    await Token.create({
-      channel_name: result.channelMetrics.channel_name,
-      channel_handle: result.channelMetrics.channel_handle,
-      thumbnail_url: result.channelMetrics.thumbnail_url,
-      token_symbol: result.tokenArgs.token_symbol,
-      token_title: result.tokenArgs.token_title,
-      token_uri: result.tokenArgs.token_uri,
-      mint_address: result.mint,
-      metadata_address: result.metadata,
-      payer_public: payer.publicKey.toString(),
-      payer_secret: payer.secretKey.toString(),
-      associated_token_address: result.ata,
-      signature: result.signature,
-      initial_price: price,
-      pool_supply: supply,
-      pool_sol: initialSol,
-      market_cap: price * supply,
-    });
-
-    console.log('Token info saved to database!');
-  } catch (error) {
-    console.error('Failed to create token:', error);
-  }
-}
-
 export default YouTubeTokenFactory;
-
-main().catch(console.error);

@@ -7,13 +7,16 @@ import authRouter from "./src/routes/authRoutes.js";
 import tokenRouter from "./src/routes/tokenRoutes.js";
 import walletRouter from "./src/routes/walletRoutes.js";
 import { verifyToken } from "./src/middlewares/authMiddleware.js";
+import session from "express-session";
 import "./src/config/passport.js";
 import marketRouter from "./src/routes/marketRoutes.js";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
+
 const app = express();
 app.use(express.json());
-
+app.use(cookieParser());
 connectDB();
 
 app.use(cors({
@@ -22,12 +25,22 @@ app.use(cors({
 }));
 
 // Initialize Passport
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 24 * 60 * 60 * 1000,
+    },
+  })
+);
 app.use(passport.initialize());
-
+app.use(passport.session());
 // Routes
 app.use("/auth", authRouter);
 app.use("/api/wallet", walletRouter);
-app.use("/token", tokenRouter);
+app.use("/api/token", tokenRouter);
 app.use("/api/market", marketRouter);
 
 // Example protected route
@@ -35,10 +48,6 @@ app.get("/protected", verifyToken, (req, res) => {
     res.json({ message: "🔒 Access granted", user: req.user });
 });
 
-// Home route
-app.get("/", (req, res) => {
-    res.status(200).send("Welcome to the Home Page!");
-});
 
 // Start server
 const PORT = process.env.PORT;

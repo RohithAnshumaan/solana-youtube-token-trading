@@ -13,11 +13,15 @@ const TokenSchema = new mongoose.Schema({
   payer_secret: String,
   associated_token_address: String, // ✅ NEW FIELD
   signature: String,
-  initial_price: Number,
+  price: Number,
   pool_supply: Number,
   pool_sol: Number,
   market_cap: Number,
   created_at: { type: Date, default: Date.now },
+  price_history: [{
+    price: Number,
+    timestamp: { type: Date, default: Date.now }
+  }]
 });
 
 const Token = mongoose.model('Token', TokenSchema);
