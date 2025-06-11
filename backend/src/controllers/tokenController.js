@@ -2,10 +2,10 @@ import { Connection, PublicKey, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.j
 import axios from 'axios';
 import User from '../models/userModel.js';
 import Token from '../models/token.js';
-import connectDB from '../../utils/db.js';
+import { YouTubeChannelAnalyzer } from '../../utils/fetch_metrics.js';
 import YouTubeTokenFactory from '../../clients/create_token.js';
 import dotenv from 'dotenv';
-import { loadDefaultWallet, loadTokenSourceWallet, AMMClient } from '../../clients/amm_client.js'
+import { loadDefaultWallet, loadTokenSourceWallet, AMMClient, fetchTokenData, storePoolData } from '../../clients/amm_client.js'
 import { AMMSwapClient, fetchTokenAndPoolData, loadUserWallet } from '../../clients/swap_client.js';
 
 dotenv.config({ path: './backend/.env' });
@@ -37,29 +37,17 @@ async function storeSwapData(swapData, userEmail, tokenSymbol) {
     }
 }
 
-export const createTokenController = async (req, res) => {
-    const { googleId } = req.params;
-
+export const fetchYoutubeChannelData = async (req, res) => {
     try {
-        await connectDB();
+        const accessToken = req.user.accessToken;
 
-        const user = await User.findOne({ googleId });
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const accessToken = user.accessToken;
-        if (!accessToken) {
-            return res.status(400).json({ error: 'No access token found for this user' });
-        }
-
-        // Fetch user's YouTube channel info
+        // Step 1: Fetch the authenticated user's YouTube channel handle
         const response = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
             headers: {
                 Authorization: `Bearer ${accessToken}`,
             },
             params: {
-                part: 'snippet,statistics',
+                part: 'snippet',
                 mine: true,
             },
         });
@@ -69,11 +57,67 @@ export const createTokenController = async (req, res) => {
             return res.status(404).json({ error: 'No YouTube channel found for this account' });
         }
 
-        // Extract relevant data
-        const channelHandle = `@${channelData.snippet.customUrl || channelData.snippet.title.replace(/\s+/g, '')}`;
-        const channelName = channelData.snippet.title;
+        const channelHandle = channelData.snippet.customUrl
+            ? channelData.snippet.customUrl.replace(/^@/, '')
+            : channelData.snippet.title.replace(/\s+/g, '');
 
-        console.log(`Fetched YouTube channel: ${channelName} (${channelHandle})`);
+        console.log(`Fetched YouTube channel: ${channelData.snippet.title} (@${channelHandle})`);
+
+        // Step 2: Use your YouTubeChannelAnalyzer
+        const analyzer = new YouTubeChannelAnalyzer();
+        const metrics = await analyzer.getChannelMetrics(channelHandle);
+
+        if (!metrics) {
+            return res.status(500).json({ error: 'Failed to analyze YouTube channel metrics.' });
+        }
+
+        // Step 3: Convert ChannelMetrics instance to plain object
+        const plainMetrics = {
+            channelName: metrics.channel_name,
+            channelHandle: metrics.channel_handle,
+            subscribers: metrics.subscribers,
+            totalViews: metrics.total_views,
+            totalVideos: metrics.total_videos,
+            avgRecentViews: metrics.avg_recent_views,
+            avgRecentLikes: metrics.avg_recent_likes,
+            thumbnailUrl: metrics.thumbnail_url,
+        };
+
+        // Step 4: Update or Insert metrics in the 'channelInfo' array
+        const updateResult = await User.updateOne(
+            { _id: req.user._id, "channelInfo.channelHandle": plainMetrics.channelHandle },
+            { $set: { "channelInfo.$": plainMetrics } }
+        );
+
+        if (updateResult.matchedCount === 0) {
+            // No existing entry, so push a new one
+            await User.updateOne(
+                { _id: req.user._id },
+                { $push: { channelInfo: plainMetrics } }
+            );
+        }
+
+        // Step 5: Send metrics as JSON
+        return res.json(metrics);
+    } catch (err) {
+        console.error("Failed to fetch YouTube Channel data", err);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+
+export const createTokenController = async (req, res) => {
+    try {
+        const googleId = req.user.googleId;
+        // Fetch stored channel metrics from the User's channelInfo
+        const user = await User.findOne({googleId});
+
+        if (!user || !user.channelInfo || user.channelInfo.length === 0) {
+            return res.status(404).json({ error: 'No stored channel metrics found for this channel handle.' });
+        }
+
+        const storedMetrics = user.channelInfo[0];
+        console.log("THE STORED METRICS ARE, ", storedMetrics);
 
         // Setup Solana connection and a new payer wallet
         const connection = new Connection(RPC_URL, 'confirmed');
@@ -85,19 +129,23 @@ export const createTokenController = async (req, res) => {
 
         // Create token using YouTubeTokenFactory
         const factory = new YouTubeTokenFactory(connection, payer);
-        const result = await factory.createChannelToken(channelHandle);
+
+        // Convert storedMetrics to the format expected by createChannelToken
+        // Assuming factory.createChannelToken can take stored metrics directly (if not, you might need to adapt it)
+        const result = await factory.createChannelToken(String(storedMetrics.channelHandle));
+
 
         // Calculate token economics
-        const price = factory.calculateInitialPrice(result.channelMetrics);
-        const supply = factory.calculateTokenSupply(result.channelMetrics);
-        const initialSol = factory.calculateInitialSol(result.channelMetrics);
+        const price = factory.calculateInitialPrice(storedMetrics);
+        const supply = factory.calculateTokenSupply(storedMetrics);
+        const initialSol = factory.calculateInitialSol(storedMetrics);
         const marketCap = price * supply;
 
         // Save to Tokens collection
         await Token.create({
-            channel_name: result.channelMetrics.channel_name,
-            channel_handle: result.channelMetrics.channel_handle,
-            thumbnail_url: result.channelMetrics.thumbnail_url,
+            channel_name: storedMetrics.channelName,
+            channel_handle: storedMetrics.channelHandle,
+            thumbnail_url: storedMetrics.thumbnailUrl,
             token_symbol: result.tokenArgs.token_symbol,
             token_title: result.tokenArgs.token_title,
             token_uri: result.tokenArgs.token_uri,
@@ -138,13 +186,15 @@ export const createTokenController = async (req, res) => {
         // Respond with token details
         return res.status(201).json({
             message: 'Token created successfully',
-            mint_address: result.mint,
-            token_symbol: result.tokenArgs.token_symbol,
-            token_title: result.tokenArgs.token_title,
-            initial_price: price,
-            pool_supply: supply,
-            pool_sol: initialSol,
-            market_cap: marketCap,
+            data: {
+                mint_address: result.mint,
+                token_symbol: result.tokenArgs.token_symbol,
+                token_title: result.tokenArgs.token_title,
+                initial_price: price,
+                pool_supply: supply,
+                pool_sol: initialSol,
+                market_cap: marketCap,
+            }
         });
     } catch (error) {
         console.error('Error creating token:', error);
@@ -152,8 +202,9 @@ export const createTokenController = async (req, res) => {
     }
 };
 
+
 export const createAMMController = async (req, res) => {
-    const { googleId } = req.params;
+    const googleId = req.user.googleId;
 
     try {
         // Step 1: Fetch user
@@ -210,7 +261,7 @@ export const createAMMController = async (req, res) => {
 };
 
 export const buyTokenController = async (req, res) => {
-    const { googleId } = req.user; // Assuming authentication middleware sets req.user
+    const googleId = req.user.googleId;
     const { solAmount } = req.body;
 
     if (!solAmount || solAmount <= 0) {
@@ -220,10 +271,6 @@ export const buyTokenController = async (req, res) => {
     try {
         // Fetch user from DB
         const user = await User.findOne({ googleId });
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
         if (!user.solWalletSecretKey) {
             return res.status(400).json({ error: 'User does not have a linked SOL wallet' });
         }
@@ -242,7 +289,7 @@ export const buyTokenController = async (req, res) => {
 
         // Perform SOL -> Token swap
         const swapResult = await swapClient.swapSolForTokens(poolData, solAmount);
-        
+
         await storeSwapData(swapResult, user.email, poolData.token_symbol);
 
         return res.status(200).json({
@@ -256,7 +303,7 @@ export const buyTokenController = async (req, res) => {
 };
 
 export const sellTokenController = async (req, res) => {
-    const { googleId } = req.user;
+    const googleId = req.user.googleId;
     const { tokenAmount } = req.body;
 
     if (!tokenAmount || tokenAmount <= 0) {
@@ -288,7 +335,7 @@ export const sellTokenController = async (req, res) => {
 
         // Perform Token -> SOL swap
         const swapResult = await swapClient.swapTokensForSol(poolData, tokenAmount);
-        
+
         await storeSwapData(swapResult, user.email, poolData.token_symbol);
 
         return res.status(200).json({

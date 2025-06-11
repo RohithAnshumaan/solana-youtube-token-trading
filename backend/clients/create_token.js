@@ -271,6 +271,7 @@ class YouTubeTokenFactory {
    * Calculate initial token price using Python algorithm - raw values instead of logarithmic
    */
   calculateInitialPrice(channelMetrics) {
+    console.log(channelMetrics);
     const subscriberWeight = 0.5;
     const viewWeight = 0.3;
     const engagementWeight = 0.2;
@@ -279,11 +280,11 @@ class YouTubeTokenFactory {
     const subScore = Math.log10(Math.max(channelMetrics.subscribers, 1)) / 7; // Max at 10M subs = ~1
     
     // Normalize view score
-    const viewScore = Math.log10(Math.max(channelMetrics.avg_recent_views, 1)) / 6; // Max at 1M views = ~1
+    const viewScore = Math.log10(Math.max(channelMetrics.avgRecentViews, 1)) / 6; // Max at 1M views = ~1
     
     // Calculate engagement rate
-    const engagementRate = channelMetrics.avg_recent_views > 0
-      ? channelMetrics.avg_recent_likes / channelMetrics.avg_recent_views
+    const engagementRate = channelMetrics.avgRecentViews > 0
+      ? channelMetrics.avgRecentLikes / channelMetrics.avgRecentViews
       : 0;
     const engagementScore = Math.min(engagementRate * 10, 1); // Cap at 1
     
@@ -300,6 +301,7 @@ class YouTubeTokenFactory {
     const maxPrice = 1.0;    // ₹14,000
     
     const price = minPrice + (compositeScore * (maxPrice - minPrice));
+    console.log("TOKEN PRICE, ", price);
     return Math.round(price * 1000000) / 1000000; // 6 decimal places
   }
 
@@ -312,16 +314,12 @@ class YouTubeTokenFactory {
     const baseSupply = Math.floor(50000 * Math.pow(logSubs, 1.5));
     
     // Engagement modifier (smaller impact)
-    const engagementRate = channelMetrics.avg_recent_views > 0
-      ? channelMetrics.avg_recent_likes / channelMetrics.avg_recent_views
+    const engagementRate = channelMetrics.avgRecentViews > 0
+      ? channelMetrics.avgRecentLikes / channelMetrics.avgRecentViews
       : 0;
     const engagementModifier = 1 + Math.min(engagementRate * 2, 0.3);
     
-    // Growth modifier (smaller impact)
-    const growthRate = channelMetrics.subscriber_growth_rate || 0;
-    const growthModifier = 1 + Math.min(Math.abs(growthRate), 0.2);
-    
-    const totalSupply = Math.floor(baseSupply * engagementModifier * growthModifier);
+    const totalSupply = Math.floor(baseSupply * engagementModifier);
     
     // Reasonable supply bounds
     const minSupply = 100000;   // 100K tokens

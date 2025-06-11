@@ -1,11 +1,11 @@
 import express from "express";
-import { createWallet, depositHistory, depositSOL } from "../controllers/walletController.js";
+import { createOrDepositWallet, depositHistory, getBalance } from "../controllers/walletController.js";
 import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const walletRouter = express.Router();
 
-walletRouter.post("/create", createWallet)
-walletRouter.post("/deposit", verifyToken, depositSOL);
-walletRouter.get("/history", depositHistory);
+walletRouter.get("/getbalance", verifyToken, getBalance);
+walletRouter.post("/deposit", verifyToken, createOrDepositWallet);
+walletRouter.get("/history", verifyToken, depositHistory);
 
 export default walletRouter;

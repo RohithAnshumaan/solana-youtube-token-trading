@@ -24,19 +24,30 @@ const userSchema = new mongoose.Schema({
     timestamp: { type: Date, default: Date.now },
   }],
   createdTokens: [
-  {
-    token_title: String,
-    token_symbol: String,
-    token_title: String,
-    thumbnail_url: String,
-    initial_price: Number,
-    pool_supply: Number,
-    pool_sol: Number,
-    market_cap: Number,
-    created_at: { type: Date, default: Date.now }
-  }
-]
-
+    {
+      token_title: String,
+      token_symbol: String,
+      token_title: String,
+      thumbnail_url: String,
+      initial_price: Number,
+      pool_supply: Number,
+      pool_sol: Number,
+      market_cap: Number,
+      created_at: { type: Date, default: Date.now }
+    }
+  ],
+channelInfo: [
+    {
+      avgRecentLikes: Number,
+      avgRecentViews: Number,
+      channelHandle: String,
+      channelName: String,
+      subscribers: Number,
+      thumbnailUrl: String,
+      totalVideos: Number,
+      totalViews: Number
+    }
+  ]
 });
 
 const User = mongoose.model("User", userSchema);

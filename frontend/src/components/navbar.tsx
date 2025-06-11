@@ -1,4 +1,5 @@
-import { useState } from "react"
+import { useState, useEffect } from "react";
+import axios from "axios";
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -7,6 +8,32 @@ import { TrendingUp, Wallet, User, LogOut } from "lucide-react"
 
 export function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  
+  const createWallet = async () => {
+    const response = await axios.post("http://localhost:8080/api/wallet/create", {withCredentials : true});
+    console.log(response.data);
+  }
+  
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const response = await axios.get("http://localhost:8080/auth/isLoggedIn", {
+          withCredentials: true, // IMPORTANT: send cookies
+        });
+
+        if (response.data.success) {
+          setIsLoggedIn(true);
+        } else {
+          setIsLoggedIn(false);
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        setIsLoggedIn(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
   
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-glass border-b border-gray-800/50">
@@ -41,7 +68,8 @@ export function Navbar() {
                 <Link to="/deposit">
                   <Button
                     variant="outline"
-                    className="border-gray-700 text-gray-300 hover:bg-white/10 backdrop-blur-sm"
+                    className="border-gray-700 text-black hover:bg-white/10 backdrop-blur-sm"
+                    onClick={createWallet}
                   >
                     <Wallet className="h-4 w-4 mr-2" />
                     Deposit
@@ -76,18 +104,11 @@ export function Navbar() {
                   variant="ghost"
                   className="text-gray-300 hover:text-white hover:bg-white/10"
                   onClick={() => {
-                    window.location.href = "http://localhost:8080/auth/google";
+                    window.location.href = "http://localhost:8080/auth/google/callback";
                     setIsLoggedIn(true);
                   }}
                 >
                   Sign In
-                </Button>
-                <Button
-                  variant="outline"
-                  className="border-gray-700 hover:bg-white/10 hover:text-white backdrop-blur-sm"
-                  onClick={() => setIsLoggedIn(true)}
-                >
-                  Sign Up
                 </Button>
               </>
             )}

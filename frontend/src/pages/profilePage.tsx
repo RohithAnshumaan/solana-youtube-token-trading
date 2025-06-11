@@ -1,25 +1,12 @@
-import { Navbar } from "@/components/navbar";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage
-} from "@/components/ui/avatar";
-import {
-  Wallet,
-  Mail,
-  TrendingUp,
-  TrendingDown,
-  ArrowUpRight,
-  ArrowDownLeft
-} from "lucide-react";
+"use client"
+
+import { Navbar } from "@/components/navbar"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Wallet, Mail, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownLeft } from "lucide-react"
+// import Image from "next/image"
 
 // Mock user data
 const userData = {
@@ -27,7 +14,7 @@ const userData = {
   walletAddress: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
   balance: 15.67,
   joinDate: "January 2024",
-};
+}
 
 const createdTokens = [
   {
@@ -38,7 +25,7 @@ const createdTokens = [
     marketCap: 245000,
     change24h: 12.5,
   },
-];
+]
 
 const holdings = [
   {
@@ -65,7 +52,7 @@ const holdings = [
     value: 1784.0,
     change24h: -2.34,
   },
-];
+]
 
 const transactions = [
   {
@@ -104,12 +91,10 @@ const transactions = [
     date: "2024-01-12 11:20",
     status: "Completed",
   },
-];
+]
 
 export default function ProfilePage() {
-  const totalPortfolioValue =
-    holdings.reduce((sum, holding) => sum + holding.value, 0) +
-    userData.balance * 85.5;
+  const totalPortfolioValue = holdings.reduce((sum, holding) => sum + holding.value, 0) + userData.balance * 85.5
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -121,37 +106,23 @@ export default function ProfilePage() {
 
       <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 relative z-10">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-5xl font-bold gradient-text mb-8">
-            Profile Dashboard
-          </h1>
+          <h1 className="text-5xl font-bold gradient-text mb-8">Profile Dashboard</h1>
 
           {/* User Info & Balance */}
           <div className="grid lg:grid-cols-3 gap-8 mb-8">
-            {/* Profile Info */}
             <Card className="backdrop-blur-glass border-gray-800/50">
               <CardHeader>
-                <CardTitle className="text-white">
-                  Profile Information
-                </CardTitle>
+                <CardTitle className="text-white">Profile Information</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-4">
                   <Avatar className="h-16 w-16">
-                    <AvatarImage
-                      src="/placeholder-user.jpg"
-                      alt="Profile"
-                    />
-                    <AvatarFallback className="bg-gray-700 text-white text-xl">
-                      U
-                    </AvatarFallback>
+                    <AvatarImage src="/placeholder-user.jpg" alt="Profile" />
+                    <AvatarFallback className="bg-gray-700 text-white text-xl">U</AvatarFallback>
                   </Avatar>
                   <div>
-                    <div className="text-white font-semibold text-lg">
-                      User Profile
-                    </div>
-                    <div className="text-gray-400">
-                      Member since {userData.joinDate}
-                    </div>
+                    <div className="text-white font-semibold text-lg">User Profile</div>
+                    <div className="text-gray-400">Member since {userData.joinDate}</div>
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -162,29 +133,21 @@ export default function ProfilePage() {
                   <div className="flex items-center space-x-2">
                     <Wallet className="h-4 w-4 text-gray-400" />
                     <span className="text-gray-300 font-mono text-sm">
-                      {userData.walletAddress.slice(0, 8)}...
-                      {userData.walletAddress.slice(-8)}
+                      {userData.walletAddress.slice(0, 8)}...{userData.walletAddress.slice(-8)}
                     </span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Current Balance */}
             <Card className="backdrop-blur-glass border-gray-800/50">
               <CardHeader>
-                <CardTitle className="text-white">
-                  Current Balance
-                </CardTitle>
+                <CardTitle className="text-white">Current Balance</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-white mb-2">
-                    {userData.balance} SOL
-                  </div>
-                  <div className="text-gray-400 mb-4">
-                    ≈ ${ (userData.balance * 85.5).toFixed(2) } USD
-                  </div>
+                  <div className="text-3xl font-bold text-white mb-2">{userData.balance} SOL</div>
+                  <div className="text-gray-400 mb-4">≈ ${(userData.balance * 85.5).toFixed(2)} USD</div>
                   <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600">
                     Deposit Funds
                   </Button>
@@ -192,18 +155,13 @@ export default function ProfilePage() {
               </CardContent>
             </Card>
 
-            {/* Portfolio Value */}
             <Card className="backdrop-blur-glass border-gray-800/50">
               <CardHeader>
-                <CardTitle className="text-white">
-                  Portfolio Value
-                </CardTitle>
+                <CardTitle className="text-white">Portfolio Value</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-white mb-2">
-                    ${totalPortfolioValue.toFixed(2)}
-                  </div>
+                  <div className="text-3xl font-bold text-white mb-2">${totalPortfolioValue.toFixed(2)}</div>
                   <div className="text-gray-400 mb-2">Total Portfolio</div>
                   <div className="text-green-400 flex items-center justify-center">
                     <TrendingUp className="h-4 w-4 mr-1" />
@@ -223,41 +181,27 @@ export default function ProfilePage() {
               {createdTokens.length > 0 ? (
                 <div className="space-y-4">
                   {createdTokens.map((token, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
-                    >
+                    <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                       <div className="flex items-center space-x-4">
-                        <img
+                        {/* <Image
                           src={token.image || "/placeholder.svg"}
                           alt={token.channelName}
                           width={40}
                           height={40}
                           className="rounded-full"
-                        />
+                        /> */}
                         <div>
-                          <div className="text-white font-semibold">
-                            {token.channelName}
-                          </div>
-                          <Badge
-                            variant="secondary"
-                            className="bg-gray-700 text-gray-300"
-                          >
+                          <div className="text-white font-semibold">{token.channelName}</div>
+                          <Badge variant="secondary" className="bg-gray-700 text-gray-300">
                             {token.symbol}
                           </Badge>
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="text-white font-semibold">
-                          ${token.price.toFixed(2)}
-                        </div>
-                        <div className="text-sm text-gray-400">
-                          Market Cap: $
-                          {(token.marketCap / 1000).toFixed(0)}K
-                        </div>
+                        <div className="text-white font-semibold">${token.price.toFixed(2)}</div>
+                        <div className="text-sm text-gray-400">Market Cap: ${(token.marketCap / 1000).toFixed(0)}K</div>
                         <div className="text-green-400 text-sm flex items-center">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          +{token.change24h.toFixed(2)}%
+                          <TrendingUp className="h-3 w-3 mr-1" />+{token.change24h.toFixed(2)}%
                         </div>
                       </div>
                     </div>
@@ -265,9 +209,7 @@ export default function ProfilePage() {
                 </div>
               ) : (
                 <div className="text-center py-8">
-                  <div className="text-gray-400 mb-4">
-                    You haven't created any tokens yet
-                  </div>
+                  <div className="text-gray-400 mb-4">You haven't created any tokens yet</div>
                   <Button className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600">
                     Create Your First Token
                   </Button>
@@ -284,42 +226,28 @@ export default function ProfilePage() {
             <CardContent>
               <div className="space-y-4">
                 {holdings.map((holding, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
-                  >
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                     <div className="flex items-center space-x-4">
-                      <img
+                      {/* <Image
                         src={holding.image || "/placeholder.svg"}
                         alt={holding.channelName}
                         width={40}
                         height={40}
                         className="rounded-full"
-                      />
+                      /> */}
                       <div>
-                        <div className="text-white font-semibold">
-                          {holding.channelName}
-                        </div>
-                        <Badge
-                          variant="secondary"
-                          className="bg-gray-700 text-gray-300"
-                        >
+                        <div className="text-white font-semibold">{holding.channelName}</div>
+                        <Badge variant="secondary" className="bg-gray-700 text-gray-300">
                           {holding.symbol}
                         </Badge>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-white font-semibold">
-                        {holding.amount} tokens
-                      </div>
-                      <div className="text-gray-400">
-                        ${holding.value.toFixed(2)}
-                      </div>
+                      <div className="text-white font-semibold">{holding.amount} tokens</div>
+                      <div className="text-gray-400">${holding.value.toFixed(2)}</div>
                       <div
                         className={`text-sm flex items-center ${
-                          holding.change24h >= 0
-                            ? "text-green-400"
-                            : "text-red-400"
+                          holding.change24h >= 0 ? "text-green-400" : "text-red-400"
                         }`}
                       >
                         {holding.change24h >= 0 ? (
@@ -340,25 +268,16 @@ export default function ProfilePage() {
           {/* Transaction History */}
           <Card className="backdrop-blur-glass border-gray-800/50">
             <CardHeader>
-              <CardTitle className="text-white">
-                Transaction History
-              </CardTitle>
+              <CardTitle className="text-white">Transaction History</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {transactions.map((tx, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-4 bg-gray-800 rounded-lg"
-                  >
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div
                         className={`p-2 rounded-full ${
-                          tx.type === "buy"
-                            ? "bg-green-900"
-                            : tx.type === "sell"
-                            ? "bg-red-900"
-                            : "bg-blue-900"
+                          tx.type === "buy" ? "bg-green-900" : tx.type === "sell" ? "bg-red-900" : "bg-blue-900"
                         }`}
                       >
                         {tx.type === "buy" ? (
@@ -381,13 +300,8 @@ export default function ProfilePage() {
                         {tx.type === "deposit" ? "+" : ""}
                         {tx.amount} {tx.token}
                       </div>
-                      <div className="text-gray-400 text-sm">
-                        ${tx.total.toFixed(2)}
-                      </div>
-                      <Badge
-                        variant="secondary"
-                        className="bg-green-900 text-green-400 text-xs"
-                      >
+                      <div className="text-gray-400 text-sm">${tx.total.toFixed(2)}</div>
+                      <Badge variant="secondary" className="bg-green-900 text-green-400 text-xs">
                         {tx.status}
                       </Badge>
                     </div>
@@ -395,10 +309,7 @@ export default function ProfilePage() {
                 ))}
               </div>
               <div className="text-center mt-6">
-                <Button
-                  variant="outline"
-                  className="border-gray-600 text-gray-300 hover:bg-gray-800"
-                >
+                <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
                   View All Transactions
                 </Button>
               </div>
@@ -407,5 +318,5 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

@@ -94,7 +94,7 @@ export default function HomePage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-white/10 backdrop-blur-sm px-10 py-4 text-lg hover-lift btn-press"
+                    className="border-gray-600 text-black hover:bg-white/10 backdrop-blur-sm px-10 py-4 text-lg hover-lift btn-press"
                   >
                     Explore Market
                   </Button>
@@ -136,38 +136,6 @@ export default function HomePage() {
                 <p className="text-gray-400">Built on Solana with enterprise-grade security and transparency.</p>
               </CardContent>
             </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Enhanced Stats Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-900/30">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div className="hover-scale">
-              <div className="text-3xl font-bold text-white mb-2 counter">
-                $
-                {counters.volume >= 1000000
-                  ? `${(counters.volume / 1000000).toFixed(1)}M`
-                  : `${(counters.volume / 1000).toFixed(0)}K`}
-                +
-              </div>
-              <div className="text-gray-400">Total Volume</div>
-            </div>
-            <div className="hover-scale">
-              <div className="text-3xl font-bold text-white mb-2 counter">{counters.tokens}+</div>
-              <div className="text-gray-400">Active Tokens</div>
-            </div>
-            <div className="hover-scale">
-              <div className="text-3xl font-bold text-white mb-2 counter">
-                {counters.traders >= 1000 ? `${(counters.traders / 1000).toFixed(0)}K` : counters.traders}+
-              </div>
-              <div className="text-gray-400">Traders</div>
-            </div>
-            <div className="hover-scale">
-              <div className="text-3xl font-bold text-white mb-2 counter">{counters.uptime.toFixed(1)}%</div>
-              <div className="text-gray-400">Uptime</div>
-            </div>
           </div>
         </div>
       </section>

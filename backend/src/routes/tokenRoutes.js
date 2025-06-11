@@ -1,11 +1,13 @@
 import express from 'express';
-import { buyTokenController, createAMMController, createTokenController, sellTokenController } from '../controllers/tokenController.js';
+import { buyTokenController, createAMMController, createTokenController, fetchYoutubeChannelData, sellTokenController } from '../controllers/tokenController.js';
+import { verifyToken } from '../middlewares/authMiddleware.js';
 
 const tokenRouter = express.Router();
 
-tokenRouter.post('/create-token/:googleId', createTokenController); 
-tokenRouter.post('/create-amm/:googleId', createAMMController)
-tokenRouter.post('/:id/buy', buyTokenController)
-tokenRouter.post('/:id/sell/:googleId', sellTokenController)
+tokenRouter.post('/create-token', verifyToken, createTokenController); 
+tokenRouter.post('/create-amm', verifyToken, createAMMController)
+tokenRouter.post('/:id/buy', verifyToken, buyTokenController)
+tokenRouter.post('/:id/sell', verifyToken, sellTokenController)
+tokenRouter.get('/fetch', verifyToken, fetchYoutubeChannelData);
 
 export default tokenRouter;

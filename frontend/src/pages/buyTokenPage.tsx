@@ -1,18 +1,17 @@
-import { useState } from "react";
-import { Navbar } from "@/components/navbar";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { ArrowUpDown, TrendingUp, TrendingDown } from "lucide-react";
+"use client"
+
+import { useState } from "react"
+import { Navbar } from "@/components/navbar"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Badge } from "@/components/ui/badge"
+import { ArrowUpDown, TrendingUp, TrendingDown } from "lucide-react"
+import { toast } from "sonner"
+import axios from "axios"
+// import Image from "next/image"
 
 // Mock top tokens data
 const topTokens = [
@@ -56,20 +55,48 @@ const topTokens = [
     price: 9.34,
     change24h: -1.23,
   },
-];
+]
 
 export default function BuyTokensPage() {
-  const [sellToken, setSellToken] = useState("SOL");
-  const [buyToken, setBuyToken] = useState("MRBEAST");
-  const [sellAmount, setSellAmount] = useState("");
-  const [buyAmount, setBuyAmount] = useState("");
+  const [sellToken, setSellToken] = useState("SOL")
+  const [buyToken, setBuyToken] = useState("")
+  const [sellAmount, setSellAmount] = useState("")
+  const [buyAmount, setBuyAmount] = useState("")
+  
+  const handleBuyToken = async () => {
+  if (!sellAmount || parseFloat(sellAmount) <= 0) {
+    toast.error("Please enter a valid SOL amount to sell.");
+    return;
+  }
+
+  try {
+    const tokenId = buyToken; 
+
+    const response = await axios.post(
+      `http://localhost:8080/api/token/${tokenId}/buy`,
+      { solAmount: parseFloat(sellAmount) }, // backend expects solAmount
+      { withCredentials: true } // for sending cookies (like JWT)
+    );
+     
+    console.log(response.data.swapResult);
+
+    toast.success(`Successfully bought ${buyToken} tokens!`);
+    console.log("Swap result:", response.data.swapResult);
+    // Optionally update the UI with the result
+    setBuyAmount(response.data.swapResult.amountOut.toFixed(2));
+  } catch (error: any) {
+    console.error("Error during swap:", error);
+    const errorMessage = error.response?.data?.error || "Swap failed.";
+    toast.error(errorMessage);
+  }
+};
 
   const handleSwapTokens = () => {
-    setSellToken(buyToken);
-    setBuyToken(sellToken);
-    setSellAmount(buyAmount);
-    setBuyAmount(sellAmount);
-  };
+    setSellToken(buyToken)
+    setBuyToken(sellToken)
+    setSellAmount(buyAmount)
+    setBuyAmount(sellAmount)
+  }
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -97,37 +124,26 @@ export default function BuyTokensPage() {
                         className="flex items-center justify-between p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
                       >
                         <div className="flex items-center space-x-3">
-                          <span className="text-gray-400 font-mono text-sm w-6">
-                            #{index + 1}
-                          </span>
-                          <img
+                          <span className="text-gray-400 font-mono text-sm w-6">#{index + 1}</span>
+                          {/* <Image
                             src={token.image || "/placeholder.svg"}
                             alt={token.channelName}
                             width={40}
                             height={40}
                             className="rounded-full"
-                          />
+                          /> */}
                           <div>
-                            <div className="text-white font-semibold">
-                              {token.channelName}
-                            </div>
-                            <Badge
-                              variant="secondary"
-                              className="bg-gray-700 text-gray-300 text-xs"
-                            >
+                            <div className="text-white font-semibold">{token.channelName}</div>
+                            <Badge variant="secondary" className="bg-gray-700 text-gray-300 text-xs">
                               {token.symbol}
                             </Badge>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-white font-semibold">
-                            ${token.price.toFixed(2)}
-                          </div>
+                          <div className="text-white font-semibold">${token.price.toFixed(2)}</div>
                           <div
                             className={`text-sm flex items-center ${
-                              token.change24h >= 0
-                                ? "text-green-400"
-                                : "text-red-400"
+                              token.change24h >= 0 ? "text-green-400" : "text-red-400"
                             }`}
                           >
                             {token.change24h >= 0 ? (
@@ -169,11 +185,7 @@ export default function BuyTokensPage() {
                             USDC
                           </SelectItem>
                           {topTokens.map((token) => (
-                            <SelectItem
-                              key={token.symbol}
-                              value={token.symbol}
-                              className="text-white"
-                            >
+                            <SelectItem key={token.symbol} value={token.symbol} className="text-white">
                               {token.symbol}
                             </SelectItem>
                           ))}
@@ -186,9 +198,7 @@ export default function BuyTokensPage() {
                         className="flex-1 bg-gray-800 border-gray-700 text-white placeholder-gray-400"
                       />
                     </div>
-                    <div className="text-sm text-gray-400">
-                      Balance: 10.5 {sellToken}
-                    </div>
+                    <div className="text-sm text-gray-400">Balance: 10.5 {sellToken}</div>
                   </div>
 
                   {/* Swap Button */}
@@ -213,11 +223,7 @@ export default function BuyTokensPage() {
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
                           {topTokens.map((token) => (
-                            <SelectItem
-                              key={token.symbol}
-                              value={token.symbol}
-                              className="text-white"
-                            >
+                            <SelectItem key={token.symbol} value={token.symbol} className="text-white">
                               {token.symbol}
                             </SelectItem>
                           ))}
@@ -251,7 +257,7 @@ export default function BuyTokensPage() {
                     </div>
                   </div>
 
-                  <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3">
+                  <Button onClick={handleBuyToken} className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3">
                     Buy {buyToken} Token
                   </Button>
                 </CardContent>
@@ -261,5 +267,5 @@ export default function BuyTokensPage() {
         </div>
       </div>
     </div>
-  );
+  )
 }

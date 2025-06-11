@@ -1,22 +1,16 @@
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
 
-
 dotenv.config();
 
 
 export const loginSuccess = (req, res) => {
 
     if (req.user) {
-        console.log(req.user);
         res.cookie('access_token', req.user.accessToken, {
             httpOnly: true,       // Prevents client-side JS from accessing the cookie
         });
-        res.json({
-            success: true,
-            message: 'Login successful',
-            user: req.user,
-        });
+        res.redirect("http://localhost:5173/");
     } else {
         res.status(401).json({ success: false, message: 'Not authenticated' });
     }
@@ -47,4 +41,22 @@ export const googleCallback = (req, res) => {
 
 export const loginFailure = (req, res) => {
     res.status(401).json({ message: "Login failed. Please try again." });
+};
+
+export const isLoggedIn = async (req, res) => {
+    try {
+        const user = req.user;
+        if(!user){
+            return res.status(401).json({message: "Unauthorized"});
+        }
+        // Return a success flag or user data
+        return res.json({
+            success: true,
+            message: "User is authenticated.",
+            user,
+        });
+    } catch (error) {
+        console.error("isLoggedIn error:", error);
+        res.status(500).json({ message: "Server error." });
+    }
 };

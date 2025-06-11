@@ -1,6 +1,7 @@
 import express from "express";
 import passport from "passport";
-import {loginFailure, loginSuccess, logout } from "../controllers/authController.js";
+import {isLoggedIn, loginFailure, loginSuccess, logout } from "../controllers/authController.js";
+import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const authRouter = express.Router();
 
@@ -25,6 +26,7 @@ authRouter.get(
 authRouter.get('/success', loginSuccess);
 authRouter.get('/failure', loginFailure);
 authRouter.get('/logout', logout);
+authRouter.get('/isLoggedIn', verifyToken, isLoggedIn)
 
 // authRouter.get(
 //     "/google/callback",

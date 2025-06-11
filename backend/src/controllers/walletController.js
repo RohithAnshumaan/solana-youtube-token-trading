@@ -8,8 +8,6 @@ import {
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import dotenv from "dotenv";
-import jwt from "jsonwebtoken";
-import User from "../models/userModel.js";
 
 dotenv.config();
 
@@ -22,79 +20,82 @@ const defaultWallet = Keypair.fromSecretKey(defaultWalletSecret);
 
 const INR_TO_SOL = 0.0000742; // Example static rate
 
-export const createWallet = async (req, res) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(decoded.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
-    }
-
-    // Check if user already has a wallet
-    if (user.solWalletPublicKey && user.solWalletSecretKey?.length > 0) {
-      return res.status(400).json({ message: "Wallet already exists." });
-    }
-
-    // Generate wallet
-    const walletKeypair = Keypair.generate();
-    const walletAddress = walletKeypair.publicKey.toBase58();
-    const walletSecretKeyArray = Array.from(walletKeypair.secretKey);
-
-    user.solWalletPublicKey = walletAddress;
-    user.solWalletSecretKey = walletSecretKeyArray.toString();
-
-    await user.save();
-
-    return res.json({
-      address: walletAddress,
-    });
-  } catch (err) {
-    console.error("Create wallet error:", err);
-    res.status(500).json({ message: "Server error." });
+export const getBalance = async (req, res) => {
+  try{
+    const balance = req.user.solBalance;
+    const walletAddress = req.user.solWalletPublicKey;
+    return res.status(200).json({balance, walletAddress});
+  } catch (err){
+    console.error("Error fetching balance: ", err);
+    res.status(500).json({msg: "Interval server error"});
   }
-};
+}
 
-export const depositSOL = async (req, res) => {
+export const createOrDepositWallet = async (req, res) => {
   try {
     const { amount } = req.body;
     if (!amount || amount <= 0) {
       return res.status(400).json({ message: "Invalid amount." });
     }
 
-    const user = await User.findById(req.user.userId);
+    const user = req.user;
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
 
+    let walletAddress;
+    let walletKeypair;
+
     // Check if user has a wallet
-    if (!user.solWalletPublicKey || !user.solWalletSecretKey?.length) {
-      return res.status(400).json({ message: "Wallet not found. Please create a wallet first." });
+    if (user.solWalletPublicKey && user.solWalletSecretKey?.length > 0) {
+      walletAddress = user.solWalletPublicKey;
+      const walletSecretKeyArray = user.solWalletSecretKey.split(',').map(Number);
+      walletKeypair = Keypair.fromSecretKey(Uint8Array.from(walletSecretKeyArray));
+    } else {
+      // Generate a new wallet
+      walletKeypair = Keypair.generate();
+      walletAddress = walletKeypair.publicKey.toBase58();
+      const walletSecretKeyArray = Array.from(walletKeypair.secretKey);
+
+      user.solWalletPublicKey = walletAddress;
+      user.solWalletSecretKey = walletSecretKeyArray.toString();
+      await user.save();
     }
 
-    const walletAddress = user.solWalletPublicKey;
-    const walletSecretKeyArray = user.solWalletSecretKey;
-    const walletKeypair = Keypair.fromSecretKey(Uint8Array.from(walletSecretKeyArray.split(',').map(Number)));
+    // Calculate rent-exempt minimum
+    const rentExemptMinimum = await connection.getMinimumBalanceForRentExemption(0);
 
-    const solAmount = amount * INR_TO_SOL;
+    // Transfer rent-exempt minimum from defaultWallet if this is a new wallet
+    const walletPublicKey = new PublicKey(walletAddress);
+    const existingBalance = await connection.getBalance(walletPublicKey);
 
-    const transaction = new Transaction().add(
+    let totalLamports = amount * INR_TO_SOL * LAMPORTS_PER_SOL;
+    const transaction = new Transaction();
+
+    // Fund rent-exempt minimum if needed
+    if (existingBalance < rentExemptMinimum) {
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: defaultWallet.publicKey,
+          toPubkey: walletPublicKey,
+          lamports: rentExemptMinimum - existingBalance,
+        })
+      );
+    }
+
+    // Add user's deposit amount
+    transaction.add(
       SystemProgram.transfer({
         fromPubkey: defaultWallet.publicKey,
-        toPubkey: new PublicKey(walletAddress),
-        lamports: solAmount * LAMPORTS_PER_SOL,
+        toPubkey: walletPublicKey,
+        lamports: totalLamports,
       })
     );
 
+    // Send transaction
     const signature = await sendAndConfirmTransaction(connection, transaction, [defaultWallet]);
 
-    const balance = await connection.getBalance(new PublicKey(walletAddress));
+    const balance = await connection.getBalance(walletPublicKey);
     const balanceInSOL = balance / LAMPORTS_PER_SOL;
 
     user.solBalance = balanceInSOL;
@@ -109,28 +110,25 @@ export const depositSOL = async (req, res) => {
     await user.save();
 
     return res.json({
+      message: "Deposit successful.",
       address: walletAddress,
       balance: balanceInSOL,
       signature: signature,
     });
   } catch (err) {
-    console.error("Deposit error:", err);
+    console.error("Create or Deposit Wallet error:", err);
+    if (err.logs) {
+      console.error("Transaction logs:", err.logs);
+    }
     res.status(500).json({ message: "Server error." });
   }
 };
 
 
+
 export const depositHistory = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ message: "Unauthorized" });
-    }
-
-    const token = authHeader.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    const user = await User.findById(decoded.userId);
+    const user = req.user;
     if (!user) {
       return res.status(404).json({ message: "User not found." });
     }
