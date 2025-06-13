@@ -2,13 +2,13 @@ import { Connection, PublicKey, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.j
 import axios from 'axios';
 import User from '../models/userModel.js';
 import Token from '../models/token.js';
-import { YouTubeChannelAnalyzer } from '../../utils/fetch_metrics.js';
+import { YouTubeChannelAnalyzer } from '../../clients/fetch_metrics.js';
 import YouTubeTokenFactory from '../../clients/create_token.js';
 import dotenv from 'dotenv';
 import { loadDefaultWallet, loadTokenSourceWallet, AMMClient, fetchTokenData, storePoolData } from '../../clients/amm_client.js'
 import { AMMSwapClient, fetchTokenAndPoolData, loadUserWallet } from '../../clients/swap_client.js';
 
-dotenv.config({ path: './backend/.env' });
+dotenv.config({ path: 'D:/HypeEconomy/backend/.env' });
 
 const RPC_URL = 'http://localhost:8899';
 
@@ -64,7 +64,7 @@ export const fetchYoutubeChannelData = async (req, res) => {
         console.log(`Fetched YouTube channel: ${channelData.snippet.title} (@${channelHandle})`);
 
         // Step 2: Use your YouTubeChannelAnalyzer
-        const analyzer = new YouTubeChannelAnalyzer();
+        const analyzer = new YouTubeChannelAnalyzer(process.env.GOOGLE_API_KEY);
         const metrics = await analyzer.getChannelMetrics(channelHandle);
 
         if (!metrics) {
@@ -73,14 +73,14 @@ export const fetchYoutubeChannelData = async (req, res) => {
 
         // Step 3: Convert ChannelMetrics instance to plain object
         const plainMetrics = {
-            channelName: metrics.channel_name,
-            channelHandle: metrics.channel_handle,
+            channelName: metrics.channelName,
+            channelHandle: metrics.channelHandle,
             subscribers: metrics.subscribers,
-            totalViews: metrics.total_views,
-            totalVideos: metrics.total_videos,
-            avgRecentViews: metrics.avg_recent_views,
-            avgRecentLikes: metrics.avg_recent_likes,
-            thumbnailUrl: metrics.thumbnail_url,
+            totalViews: metrics.totalViews,
+            totalVideos: metrics.totalVideos,
+            avgRecentViews: metrics.avgRecentViews,
+            avgRecentLikes: metrics.avgRecentLikes,
+            thumbnailUrl: metrics.thumbnailUrl,
         };
 
         // Step 4: Update or Insert metrics in the 'channelInfo' array
@@ -262,7 +262,7 @@ export const createAMMController = async (req, res) => {
 
 export const buyTokenController = async (req, res) => {
     const googleId = req.user.googleId;
-    const { solAmount } = req.body;
+    const { solAmount, channelName } = req.body;
 
     if (!solAmount || solAmount <= 0) {
         return res.status(400).json({ error: 'Invalid SOL amount provided' });
@@ -281,7 +281,7 @@ export const buyTokenController = async (req, res) => {
         const userWalletPubkey = user.solWalletPublicKey;
 
         // Fetch pool data
-        const poolData = await fetchTokenAndPoolData();
+        const poolData = await fetchTokenAndPoolData(channelName);
 
         // Initialize AMMSwapClient
         const swapClient = new AMMSwapClient(defaultWallet, userWallet, new PublicKey(userWalletPubkey));
@@ -304,7 +304,7 @@ export const buyTokenController = async (req, res) => {
 
 export const sellTokenController = async (req, res) => {
     const googleId = req.user.googleId;
-    const { tokenAmount } = req.body;
+    const { tokenAmount, channelName } = req.body;
 
     if (!tokenAmount || tokenAmount <= 0) {
         return res.status(400).json({ error: 'Invalid token amount provided' });
@@ -327,7 +327,7 @@ export const sellTokenController = async (req, res) => {
         const userWalletPubkey = user.solWalletPublicKey;
 
         // Fetch pool data
-        const poolData = await fetchTokenAndPoolData();
+        const poolData = await fetchTokenAndPoolData(channelName);
 
         // Initialize AMMSwapClient
         const swapClient = new AMMSwapClient(defaultWallet, userWallet, new PublicKey(userWalletPubkey));

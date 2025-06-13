@@ -1,3 +1,6 @@
+import dotenv from 'dotenv';
+dotenv.config({ path: './backend/.env' });
+
 import {
     Connection,
     PublicKey,
@@ -18,14 +21,13 @@ import {
 } from '@solana/spl-token';
 import BN from 'bn.js';
 import { MongoClient } from 'mongodb';
-import dotenv from 'dotenv';
-dotenv.config({ path: './backend/.env' });
-
+import User from '../src/models/userModel.js';
+import mongoose from 'mongoose';
 
 // MongoDB setup
 const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'youtube_tokens';
-const COLLECTION_NAME = 'users';
+const COLLECTION_NAME = 'tokens';
 
 const PROGRAM_ID = new PublicKey('9pKDtt6qeSmkbYu4Jhh65Gg5EsmcrBwdJFL1fbzFZtVJ');
 const RPC_URL = process.env.SOLANA_RPC_URL;
@@ -35,7 +37,6 @@ const DEFAULT_WALLET_PUBKEY = new PublicKey('4Vd2tqPNX4tQjsQXTz4cAqdrwrSLFhrwjHs
 async function fetchTokenAndPoolData(channelName) {
     const client = new MongoClient(MONGO_URI);
     try {
-        await client.connect();
         const db = client.db(DB_NAME);
         const collection = db.collection(COLLECTION_NAME);
 
@@ -53,7 +54,10 @@ async function fetchTokenAndPoolData(channelName) {
         }
 
         return {
+            token_title: token.token_title,
             token_symbol: token.token_symbol,
+            price: token.price,
+            url: token.thumbnail_url,
             payer_public: token.payer_public,
             payer_secret: token.payer_secret,
             mint_address: token.mint_address,
@@ -71,7 +75,7 @@ async function fetchTokenAndPoolData(channelName) {
 }
 
 class AMMSwapClient {
-    constructor(defaultWalletKeypair, userWalletKeypair, userWalletPubkey) {
+    constructor(defaultWalletKeypair, userWalletKeypair, userWalletPubkey, currentUserEmail) {
         if (defaultWalletKeypair.publicKey.toBase58() !== DEFAULT_WALLET_PUBKEY.toBase58()) {
             throw new Error(`Default wallet public key mismatch: expected ${DEFAULT_WALLET_PUBKEY.toBase58()}, got ${defaultWalletKeypair.publicKey.toBase58()}`);
         }
@@ -108,6 +112,13 @@ class AMMSwapClient {
     }
 
     async swapSolForTokens(poolData, solAmount) {
+
+        const user = await User.findOne({ email: this.currentUserEmail });
+
+        if (!user) {
+            throw new Error(`User not found with email: ${this.currentUserEmail}`);
+        }
+
         const tokenMint = new PublicKey(poolData.mint_address);
         const wsolMint = NATIVE_MINT;
 
@@ -255,6 +266,38 @@ class AMMSwapClient {
 
         console.log(`Final token balance: ${finalTokenBalance.value.uiAmount}`);
         console.log(`Final SOL balance: ${finalSolBalance / LAMPORTS_PER_SOL} SOL`);
+
+        const tokenType = poolData.token_symbol; // e.g., MRBEAST
+        const tokenTitle = poolData.token_title;
+        const tokenUrl = poolData.url;
+        const tokenPrice = poolData.price;
+        const tokenAddress = userTokenAccount.address.toBase58();
+        const tokenBalance = finalTokenBalance.value.uiAmount;
+        const tokenSecret = userTokenAccount.secretKey ? Array.from(userTokenAccount.secretKey) : [];
+
+        const walletIndex = user.wallets.findIndex(w => w.type === tokenType);
+
+        if (walletIndex >= 0) {
+            // Update existing
+            user.wallets[walletIndex].balance = tokenBalance;
+            user.wallets[walletIndex].address = tokenAddress;
+            if (tokenSecret.length) {
+                user.wallets[walletIndex].secretKey = tokenSecret;
+            }
+        } else {
+            // Insert new
+            user.wallets.push({
+                type: tokenType,
+                address: tokenAddress,
+                balance: tokenBalance,
+                secretKey: tokenSecret,
+                title: tokenTitle,
+                price: tokenPrice,
+                url: tokenUrl,
+            });
+        }
+
+        await user.save();
 
         const swapResult = {
             txSignature,

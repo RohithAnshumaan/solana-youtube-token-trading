@@ -1,30 +1,30 @@
 import axios from 'axios';
-import dotenv from 'dotenv';
-
-dotenv.config();
-const API_KEY = process.env.GOOGLE_API_KEY;
 
 class ChannelMetrics {
     constructor(channel_name, channel_handle, subscribers, total_views, total_videos, avg_recent_views, avg_recent_likes, thumbnail_url) {
-        this.channel_name = channel_name;
-        this.channel_handle = channel_handle;
+        this.channelName = channel_name;
+        this.channelHandle = channel_handle;
         this.subscribers = subscribers;
-        this.total_views = total_views;
-        this.total_videos = total_videos;
-        this.avg_recent_views = avg_recent_views;
-        this.avg_recent_likes = avg_recent_likes;
-        this.thumbnail_url = thumbnail_url;
+        this.totalViews = total_views;
+        this.totalVideos = total_videos;
+        this.avgRecentViews = avg_recent_views; // Fixed: was 'avgRecentRiews'
+        this.avgRecentLikes = avg_recent_likes;
+        this.thumbnailUrl = thumbnail_url;
     }
 }
 
 class YouTubeChannelAnalyzer {
-    constructor(apiKey = API_KEY) {
+    constructor(apiKey) {
         this.apiKey = apiKey;
     }
 
     async getChannelMetrics(username) {
         try {
-            const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&forHandle=@${username}&key=${this.apiKey}`;
+            const handle = `@${username}`;
+            const encodedHandle = encodeURIComponent(handle);
+            const channelUrl = `https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics,contentDetails&forHandle=${encodedHandle}&key=${this.apiKey}`;
+
+            console.log('Fetching channel data...');
             const channelResponse = await axios.get(channelUrl);
             const data = channelResponse.data;
 
@@ -41,6 +41,9 @@ class YouTubeChannelAnalyzer {
             const total_videos = parseInt(channel.statistics.videoCount);
             const uploads_playlist = channel.contentDetails.relatedPlaylists.uploads;
 
+            console.log(`Channel found: ${title}`);
+            console.log(`Subscribers: ${subs.toLocaleString()}`);
+
             const [avg_views, avg_likes] = await this.getRecentVideoMetrics(uploads_playlist);
 
             return new ChannelMetrics(
@@ -54,7 +57,11 @@ class YouTubeChannelAnalyzer {
                 thumbnail
             );
         } catch (error) {
-            console.error(`Error fetching channel data: ${error}`);
+            if (error.response) {
+                console.error(`YouTube API Error: ${error.response.status} - ${error.response.data?.error?.message || 'Unknown error'}`);
+            } else {
+                console.error(`Error fetching channel data: ${error.message}`);
+            }
             return null;
         }
     }
@@ -72,7 +79,7 @@ class YouTubeChannelAnalyzer {
             const videoIds = data.items.map(item => item.snippet.resourceId.videoId);
             return await this.getVideoStatistics(videoIds);
         } catch (error) {
-            console.error(`Error fetching video metrics: ${error}`);
+            console.error(`Error fetching video metrics: ${error.message}`);
             return [0, 0];
         }
     }
@@ -96,12 +103,16 @@ class YouTubeChannelAnalyzer {
             }
 
             const count = videoIds.length;
-            return [
-                count > 0 ? Math.floor(total_views / count) : 0,
-                count > 0 ? Math.floor(total_likes / count) : 0
-            ];
+            const avgViews = count > 0 ? Math.floor(total_views / count) : 0;
+            const avgLikes = count > 0 ? Math.floor(total_likes / count) : 0;
+
+            console.log(`Recent videos analyzed: ${count}`);
+            console.log(`Average views: ${avgViews.toLocaleString()}`);
+            console.log(`Average likes: ${avgLikes.toLocaleString()}`);
+
+            return [avgViews, avgLikes];
         } catch (error) {
-            console.error(`Error getting video statistics: ${error}`);
+            console.error(`Error getting video statistics: ${error.message}`);
             return [0, 0];
         }
     }

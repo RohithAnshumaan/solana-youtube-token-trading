@@ -9,14 +9,14 @@ import axios from "axios"
 import LiquidityPoolDetails from "@/components/poolDetails"
 
 interface channelData {
-  avg_recent_likes: number,
-  avg_recent_views: number,
-  channel_handle: string,
-  channel_name: string,
+  avgRecentLikes: number,
+  avgRecentViews: number,
+  channelHandle: string,
+  channelName: string,
   subscribers: number,
-  thumbnail_url: string,
-  total_videos: number,
-  total_views: number
+  thumbnailUrl: string,
+  totalVideos: number,
+  totalViews: number
 }
 
 interface channelToken {
@@ -118,8 +118,8 @@ export default function CreateTokenPage() {
                     <div className="flex items-center space-x-6 mb-8">
                       <div className="hover-scale">
                         <img
-                          src={data?.thumbnail_url || "/placeholder.svg"}
-                          alt={data?.channel_name || "Channel Thumbnail"}
+                          src={data?.thumbnailUrl || "/placeholder.svg"}
+                          alt={data?.channelName || "Channel Thumbnail"}
                           width={100}
                           height={100}
                           className="rounded-full transition-transform duration-200"
@@ -127,8 +127,8 @@ export default function CreateTokenPage() {
                       </div>
 
                       <div>
-                        <h2 className="text-2xl font-bold text-white mb-2">{data?.channel_name}</h2>
-                        <p className="text-gray-400 text-lg">{data?.channel_handle}</p>
+                        <h2 className="text-2xl font-bold text-white mb-2">{data?.channelName}</h2>
+                        <p className="text-gray-400 text-lg">{data?.channelHandle}</p>
                       </div>
                     </div>
 
@@ -140,17 +140,17 @@ export default function CreateTokenPage() {
                       </div>
                       <div className="bg-gray-800/50 rounded-lg p-4 text-center border border-gray-700 hover-lift card-glow stagger-item">
                         <Eye className="h-8 w-8 text-white mx-auto mb-2 icon-hover" />
-                        <div className="text-2xl font-bold text-white">{data?.total_views}</div>
+                        <div className="text-2xl font-bold text-white">{data?.totalViews}</div>
                         <div className="text-sm text-gray-400">Total Views</div>
                       </div>
                       <div className="bg-gray-800/50 rounded-lg p-4 text-center border border-gray-700 hover-lift card-glow stagger-item">
                         <Play className="h-8 w-8 text-white mx-auto mb-2 icon-hover" />
-                        <div className="text-2xl font-bold text-white">{data?.avg_recent_views}</div>
+                        <div className="text-2xl font-bold text-white">{data?.avgRecentViews}</div>
                         <div className="text-sm text-gray-400">Avg Views</div>
                       </div>
                       <div className="bg-gray-800/50 rounded-lg p-4 text-center border border-gray-700 hover-lift card-glow stagger-item">
                         <Heart className="h-8 w-8 text-white mx-auto mb-2 icon-hover" />
-                        <div className="text-2xl font-bold text-white">{data?.avg_recent_likes}</div>
+                        <div className="text-2xl font-bold text-white">{data?.avgRecentLikes}</div>
                         <div className="text-sm text-gray-400">Avg Likes</div>
                       </div>
                     </div>
@@ -166,7 +166,7 @@ export default function CreateTokenPage() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="border-gray-600 text-gray-300 hover:bg-white/10 px-8 py-3 hover-lift btn-press"
+                    className="border-gray-600 text-black hover:bg-white/10 px-8 py-3 hover-lift btn-press"
                   >
                     Not This Channel?
                   </Button>
@@ -224,8 +224,8 @@ export default function CreateTokenPage() {
                     <div className="flex items-center justify-center space-x-4 p-8">
                       <div className="hover-scale">
                         <img
-                          src={data?.thumbnail_url || "/placeholder.svg"}
-                          alt={data?.channel_name || "Channel Thumbnail"}
+                          src={data?.thumbnailUrl || "/placeholder.svg"}
+                          alt={data?.channelName || "Channel Thumbnail"}
                           width={100}
                           height={100}
                           className="rounded-full transition-transform duration-200" />

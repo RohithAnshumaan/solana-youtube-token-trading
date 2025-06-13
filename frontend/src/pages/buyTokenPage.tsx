@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useMemo } from "react";
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -8,101 +9,127 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpDown, TrendingUp, TrendingDown } from "lucide-react"
 import { toast } from "sonner"
 import axios from "axios"
-// import Image from "next/image"
+import { io } from "socket.io-client";
 
-// Mock top tokens data
-const topTokens = [
-  {
-    id: 1,
-    symbol: "MRBEAST",
-    channelName: "MrBeast",
-    image: "/placeholder.svg?height=40&width=40",
-    price: 12.45,
-    change24h: 5.67,
-  },
-  {
-    id: 2,
-    symbol: "MKBHD",
-    channelName: "Marques Brownlee",
-    image: "/placeholder.svg?height=40&width=40",
-    price: 15.67,
-    change24h: 8.91,
-  },
-  {
-    id: 3,
-    symbol: "PEWDIE",
-    channelName: "PewDiePie",
-    image: "/placeholder.svg?height=40&width=40",
-    price: 8.92,
-    change24h: -2.34,
-  },
-  {
-    id: 4,
-    symbol: "DUDE",
-    channelName: "Dude Perfect",
-    image: "/placeholder.svg?height=40&width=40",
-    price: 6.78,
-    change24h: 3.45,
-  },
-  {
-    id: 5,
-    symbol: "EMMA",
-    channelName: "Emma Chamberlain",
-    image: "/placeholder.svg?height=40&width=40",
-    price: 9.34,
-    change24h: -1.23,
-  },
-]
+
+interface PriceHistoryEntry {
+  price: number;
+  timestamp: Date;
+}
+
+interface Token {
+  id: string;
+  channel_name: string;
+  channel_handle: string;
+  thumbnail_url: string;
+  token_symbol: string;
+  token_title: string;
+  token_uri: string;
+  mint_address: string;
+  metadata_address: string;
+  payer_public: string;
+  payer_secret: string;
+  associated_token_address: string;  // ✅ NEW FIELD
+  signature: string;
+  price: number;
+  pool_supply: number;
+  pool_sol: number;
+  market_cap: number;
+  created_at: Date;
+  price_history: PriceHistoryEntry[];
+}
 
 export default function BuyTokensPage() {
-  const [sellToken, setSellToken] = useState("SOL")
+  const [sellToken] = useState("SOL")
   const [buyToken, setBuyToken] = useState("")
   const [sellAmount, setSellAmount] = useState("")
   const [buyAmount, setBuyAmount] = useState("")
-  
+  const [allTokens, setAllTokens] = useState<Token[]>([])
+
+  useEffect(() => {
+    const getTokens = async () => {
+      try {
+        const response = await axios.get("http://localhost:8080/api/market")
+        setAllTokens(response.data)
+      } catch (err) {
+        toast.error("Failed to load tokens.")
+      }
+    }
+    getTokens()
+  }, [])
+
+  useEffect(() => {
+    const socket = io("http://localhost:8080"); // adjust port if needed
+
+    socket.on("price_update", (data) => {
+      setAllTokens((prevTokens) =>
+        prevTokens.map((token) =>
+          token.token_symbol === data.symbol
+            ? {
+              ...token,
+              price: data.price,
+              pool_sol: data.pool_sol,
+              pool_supply: data.pool_supply,
+              market_cap: data.market_cap, // Optional: if market cap = pool SOL
+              price_history: [
+                ...(token.price_history || []),
+                { price: data.price, timestamp: new Date(data.timestamp) },
+              ],
+            }
+            : token
+        )
+      );
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
+
+
   const handleBuyToken = async () => {
-  if (!sellAmount || parseFloat(sellAmount) <= 0) {
-    toast.error("Please enter a valid SOL amount to sell.");
-    return;
+    if (!sellAmount || parseFloat(sellAmount) <= 0) {
+      toast.error("Please enter a valid SOL amount to sell.")
+      return
+    }
+
+    try {
+      // Get channelName from selected token object
+      const selectedToken = allTokens.find((token) => token.token_symbol === buyToken)
+      if (!selectedToken) {
+        toast.error("Selected token not found.")
+        return
+      }
+
+      const response = await axios.post(
+        `http://localhost:8080/api/token/buy`, // hit buyTokenController directly
+        {
+          solAmount: parseFloat(sellAmount),
+          channelName: selectedToken.channel_name,
+        },
+        { withCredentials: true }
+      )
+
+      setBuyAmount(response.data.swapResult.amountOut.toFixed(2))
+    } catch (error: any) {
+      console.error("Error during swap:", error)
+      const errorMessage = error.response?.data?.error || "Swap failed."
+      toast.error(errorMessage)
+    }
   }
 
-  try {
-    const tokenId = buyToken; 
+  const topTokens = useMemo(() => {
+  return [...allTokens]
+    .sort((a, b) => b.market_cap - a.market_cap)
+    .slice(0, 5);
+}, [allTokens]);
 
-    const response = await axios.post(
-      `http://localhost:8080/api/token/${tokenId}/buy`,
-      { solAmount: parseFloat(sellAmount) }, // backend expects solAmount
-      { withCredentials: true } // for sending cookies (like JWT)
-    );
-     
-    console.log(response.data.swapResult);
-
-    toast.success(`Successfully bought ${buyToken} tokens!`);
-    console.log("Swap result:", response.data.swapResult);
-    // Optionally update the UI with the result
-    setBuyAmount(response.data.swapResult.amountOut.toFixed(2));
-  } catch (error: any) {
-    console.error("Error during swap:", error);
-    const errorMessage = error.response?.data?.error || "Swap failed.";
-    toast.error(errorMessage);
-  }
-};
-
-  const handleSwapTokens = () => {
-    setSellToken(buyToken)
-    setBuyToken(sellToken)
-    setSellAmount(buyAmount)
-    setBuyAmount(sellAmount)
-  }
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
-      {/* Background effects */}
-      <div className="absolute inset-0 grid-background opacity-20"></div>
-
+      <div className="absolute inset-0 grid-background opacity-20" />
       <Navbar />
 
       <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8 relative z-10">
@@ -114,45 +141,35 @@ export default function BuyTokensPage() {
             <div>
               <Card className="backdrop-blur-glass border-gray-800/50">
                 <CardHeader>
-                  <CardTitle className="text-white">Top 10 Tokens</CardTitle>
+                  <CardTitle className="text-white">Top 5 Tokens</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
                     {topTokens.map((token, index) => (
                       <div
-                        key={token.id}
+                        key={token.token_symbol}
                         className="flex items-center justify-between p-3 rounded-lg bg-gray-800 hover:bg-gray-700 transition-colors"
                       >
                         <div className="flex items-center space-x-3">
                           <span className="text-gray-400 font-mono text-sm w-6">#{index + 1}</span>
-                          {/* <Image
-                            src={token.image || "/placeholder.svg"}
-                            alt={token.channelName}
+                          <img
+                            src={token.thumbnail_url || "/placeholder.svg"}
+                            alt={token.channel_name}
                             width={40}
                             height={40}
                             className="rounded-full"
-                          /> */}
+                          />
                           <div>
-                            <div className="text-white font-semibold">{token.channelName}</div>
+                            <div className="text-white font-semibold">{token.channel_name}</div>
                             <Badge variant="secondary" className="bg-gray-700 text-gray-300 text-xs">
-                              {token.symbol}
+                              {token.token_symbol}
                             </Badge>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="text-white font-semibold">${token.price.toFixed(2)}</div>
-                          <div
-                            className={`text-sm flex items-center ${
-                              token.change24h >= 0 ? "text-green-400" : "text-red-400"
-                            }`}
-                          >
-                            {token.change24h >= 0 ? (
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                            ) : (
-                              <TrendingDown className="h-3 w-3 mr-1" />
-                            )}
-                            {token.change24h >= 0 ? "+" : ""}
-                            {token.change24h.toFixed(2)}%
+                          <div className="text-white font-semibold">${token.price?.toFixed(2)}</div>
+                          <div className="text-sm text-gray-400">
+                            Market Cap: ${(token.market_cap || 0).toLocaleString()}
                           </div>
                         </div>
                       </div>
@@ -169,87 +186,44 @@ export default function BuyTokensPage() {
                   <CardTitle className="text-white">Trade Tokens</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Sell Section */}
-                  <div className="space-y-2">
-                    <Label className="text-gray-300">You're selling</Label>
-                    <div className="flex space-x-2">
-                      <Select value={sellToken} onValueChange={setSellToken}>
-                        <SelectTrigger className="w-32 bg-gray-800 border-gray-700 text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="bg-gray-800 border-gray-700">
-                          <SelectItem value="SOL" className="text-white">
-                            SOL
-                          </SelectItem>
-                          <SelectItem value="USDC" className="text-white">
-                            USDC
-                          </SelectItem>
-                          {topTokens.map((token) => (
-                            <SelectItem key={token.symbol} value={token.symbol} className="text-white">
-                              {token.symbol}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        placeholder="0.00"
-                        value={sellAmount}
-                        onChange={(e) => setSellAmount(e.target.value)}
-                        className="flex-1 bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                      />
-                    </div>
-                    <div className="text-sm text-gray-400">Balance: 10.5 {sellToken}</div>
-                  </div>
-
-                  {/* Swap Button */}
-                  <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      onClick={handleSwapTokens}
-                      className="border-gray-700 text-gray-300 hover:bg-gray-800"
-                    >
-                      <ArrowUpDown className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  {/* Buy Section */}
                   <div className="space-y-2">
                     <Label className="text-gray-300">You're buying</Label>
                     <div className="flex space-x-2">
                       <Select value={buyToken} onValueChange={setBuyToken}>
-                        <SelectTrigger className="w-32 bg-gray-800 border-gray-700 text-white">
-                          <SelectValue />
+                        <SelectTrigger className="w-48 bg-gray-800 border-gray-700 text-white">
+                          <SelectValue placeholder="Select Token" />
                         </SelectTrigger>
                         <SelectContent className="bg-gray-800 border-gray-700">
-                          {topTokens.map((token) => (
-                            <SelectItem key={token.symbol} value={token.symbol} className="text-white">
-                              {token.symbol}
+                          {allTokens.map((token: any) => (
+                            <SelectItem key={token.token_symbol} value={token.token_symbol} className="text-white">
+                              {token.channel_name} ({token.token_symbol})
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <Input
-                        placeholder="0.00"
-                        value={buyAmount}
-                        onChange={(e) => setBuyAmount(e.target.value)}
-                        className="flex-1 bg-gray-800 border-gray-700 text-white placeholder-gray-400"
-                      />
                     </div>
-                    <div className="text-sm text-gray-400">≈ $156.78</div>
                   </div>
 
-                  {/* Trade Summary */}
+                  <div className="space-y-2">
+                    <Label className="text-gray-300">You're paying in SOL</Label>
+                    <Input
+                      placeholder="Enter SOL amount"
+                      value={sellAmount}
+                      onChange={(e) => setSellAmount(e.target.value)}
+                      className="bg-gray-800 border-gray-700 text-white placeholder-gray-400"
+                    />
+                  </div>
+
                   <div className="bg-gray-800 rounded-lg p-4 space-y-2">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Exchange Rate</span>
                       <span className="text-white">
-                        1 {sellToken} = 0.85 {buyToken}
+                        {sellAmount} {sellToken} = ~ {buyToken ? buyAmount : "?"} {buyToken}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Trading Fee</span>
-                      <span className="text-white">0.25%</span>
+                      <span className="text-white">0.3%</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Slippage</span>
@@ -257,8 +231,11 @@ export default function BuyTokensPage() {
                     </div>
                   </div>
 
-                  <Button onClick={handleBuyToken} className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3">
-                    Buy {buyToken} Token
+                  <Button
+                    onClick={handleBuyToken}
+                    className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white py-3"
+                  >
+                    Buy {buyToken || "Token"}
                   </Button>
                 </CardContent>
               </Card>

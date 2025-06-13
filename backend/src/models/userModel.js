@@ -5,6 +5,9 @@ const walletSchema = new mongoose.Schema({
   address: { type: String, required: true },
   secretKey: { type: [Number], required: true },
   balance: { type: Number, default: 0 },
+  title: String,
+  price: Number,
+  url: String,
 });
 
 const userSchema = new mongoose.Schema({
@@ -25,7 +28,6 @@ const userSchema = new mongoose.Schema({
   }],
   createdTokens: [
     {
-      token_title: String,
       token_symbol: String,
       token_title: String,
       thumbnail_url: String,

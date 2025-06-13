@@ -1,5 +1,6 @@
 "use client"
 
+import { io } from "socket.io-client"
 import { useEffect, useState } from "react"
 import { Navbar } from "@/components/navbar"
 import { Button } from "@/components/ui/button"
@@ -54,6 +55,30 @@ export default function DepositPage() {
     }
     getTransactions();
   })
+  
+  useEffect(() => {
+  const socket = io("http://localhost:8080", {
+    withCredentials: true,
+  });
+
+  socket.on("connect", () => {
+    console.log("🔌 Connected to WebSocket server");
+  });
+
+  socket.on("wallet_balance_update", ({ solBalance }) => {
+    console.log("📥 Received balance update:", solBalance);
+    setBalance(solBalance);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ Disconnected from WebSocket");
+  });
+
+  return () => {
+    socket.disconnect();
+  };
+}, []);
+
 
   const confirmDeposit = async () => {
     try {

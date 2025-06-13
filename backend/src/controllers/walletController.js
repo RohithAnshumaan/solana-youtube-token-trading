@@ -18,8 +18,6 @@ const defaultWalletSecret = Uint8Array.from(
 );
 const defaultWallet = Keypair.fromSecretKey(defaultWalletSecret);
 
-const INR_TO_SOL = 0.0000742; // Example static rate
-
 export const getBalance = async (req, res) => {
   try{
     const balance = req.user.solBalance;
@@ -69,7 +67,7 @@ export const createOrDepositWallet = async (req, res) => {
     const walletPublicKey = new PublicKey(walletAddress);
     const existingBalance = await connection.getBalance(walletPublicKey);
 
-    let totalLamports = amount * INR_TO_SOL * LAMPORTS_PER_SOL;
+    let totalLamports = amount * LAMPORTS_PER_SOL;
     const transaction = new Transaction();
 
     // Fund rent-exempt minimum if needed

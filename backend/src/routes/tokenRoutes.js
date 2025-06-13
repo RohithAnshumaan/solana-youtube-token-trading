@@ -6,8 +6,8 @@ const tokenRouter = express.Router();
 
 tokenRouter.post('/create-token', verifyToken, createTokenController); 
 tokenRouter.post('/create-amm', verifyToken, createAMMController)
-tokenRouter.post('/:id/buy', verifyToken, buyTokenController)
-tokenRouter.post('/:id/sell', verifyToken, sellTokenController)
+tokenRouter.post('/buy', verifyToken, buyTokenController)
+tokenRouter.post('/sell', verifyToken, sellTokenController)
 tokenRouter.get('/fetch', verifyToken, fetchYoutubeChannelData);
 
 export default tokenRouter;

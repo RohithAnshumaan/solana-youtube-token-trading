@@ -35,7 +35,7 @@ async function main() {
     const factory = new YouTubeTokenFactory(connection, payer);
 
     // 5️⃣ Hardcoded channel handle
-    const channelHandle = '@MoreSidemen'; // replace with actual handle
+    const channelHandle = '@PewDiePie'; // replace with actual handle
 
     // 6️⃣ Create token
     const result = await factory.createChannelToken(channelHandle);
@@ -46,12 +46,14 @@ async function main() {
     const poolSupply = factory.calculateTokenSupply(result.channelMetrics);
     const poolSol = factory.calculateInitialSol(result.channelMetrics);
     const marketCap = price * poolSupply;
+    
+    console.log(result);
 
     // 8️⃣ Save to MongoDB
     const newToken = new Token({
-      channel_name: result.channelMetrics.channel_name,
-      channel_handle: result.channelMetrics.channel_handle,
-      thumbnail_url: result.channelMetrics.thumbnail_url,
+      channel_name: result.channelMetrics.channelName,
+      channel_handle: result.channelMetrics.channelHandle,
+      thumbnail_url: result.channelMetrics.thumbnailUrl,
       token_symbol: result.tokenArgs.token_symbol,
       token_title: result.tokenArgs.token_title,
       token_uri: result.tokenArgs.token_uri,

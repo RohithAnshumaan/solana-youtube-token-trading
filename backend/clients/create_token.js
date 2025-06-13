@@ -15,10 +15,10 @@ import {
 } from '@solana/spl-token';
 
 import * as borsh from 'borsh';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { YouTubeChannelAnalyzer } from '../clients/fetch_metrics.js';
+import { config } from 'dotenv';
 
-const execPromise = promisify(exec);
+config({path : "D:/HypeEconomy/backend/.env"});
 
 const PROGRAM_ID = new PublicKey('3ejw4uLZK7wqtUEmmbWDgipFABnL8SsT6qjFEcYvebmU');
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
@@ -27,37 +27,29 @@ class YouTubeTokenFactory {
   constructor(connection, payer) {
     this.connection = connection;
     this.payer = payer;
+    this.analyzer = new YouTubeChannelAnalyzer(process.env.GOOGLE_API_KEY);
+    console.log(process.env.GOOGLE_API_KEY);
   }
 
-  /**
-   * Fetch channel metrics from Python script
-   */
   async fetchChannelMetrics(channelHandle) {
     try {
-      // Remove '@' from channel handle if present
       const cleanHandle = channelHandle.startsWith('@') ? channelHandle.slice(1) : channelHandle;
+      const metrics = await this.analyzer.getChannelMetrics(cleanHandle);
 
-      // Execute Python script with channel handle as argument
-      const { stdout, stderr } = await execPromise(`python D:\\HypeEconomy\\backend\\utils\\fetch_metrics.py ${cleanHandle}`);
-
-      if (stderr) {
-        console.error('Python script error:', stderr);
-        throw new Error('Failed to fetch channel metrics');
+      if (!metrics) {
+        throw new Error('Could not retrieve channel metrics');
       }
-
-      // Parse JSON output from Python script
-      const metrics = JSON.parse(stdout);
 
       // Validate required fields
       const requiredFields = [
-        'channel_name',
-        'channel_handle',
+        'channelName',
+        'channelHandle',
         'subscribers',
-        'total_views',
-        'total_videos',
-        'avg_recent_views',
-        'avg_recent_likes',
-        'thumbnail_url'
+        'totalViews',
+        'totalVideos',
+        'avgRecentViews',
+        'avgRecentLikes',
+        'thumbnailUrl'
       ];
 
       for (const field of requiredFields) {
@@ -66,12 +58,14 @@ class YouTubeTokenFactory {
         }
       }
 
+      console.log(metrics);
       return metrics;
     } catch (error) {
       console.error('Error fetching channel metrics:', error);
       throw error;
     }
   }
+
 
   /**
    * Create a new YouTube channel token, create ATA, and mint supply
@@ -80,7 +74,7 @@ class YouTubeTokenFactory {
     try {
       // Fetch channel metrics dynamically
       const channelMetrics = await this.fetchChannelMetrics(channelHandle);
-      console.log(`Creating token for ${channelMetrics.channel_name}...`);
+      console.log(`Creating token for ${channelMetrics.channelName}...`);
 
       // Generate new mint keypair
       const mintKeypair = Keypair.generate();
@@ -110,8 +104,8 @@ class YouTubeTokenFactory {
 
       // Prepare instruction data
       const tokenArgs = {
-        token_title: `${channelMetrics.channel_name} Token`,
-        token_symbol: this.generateTokenSymbol(channelMetrics.channel_name),
+        token_title: `${channelMetrics.channelName} Token`,
+        token_symbol: this.generateTokenSymbol(channelMetrics.channelName),
         token_uri: await this.uploadMetadata(channelMetrics),
         token_decimals: 9,
       };
@@ -250,16 +244,16 @@ class YouTubeTokenFactory {
    */
   async uploadMetadata(channelMetrics) {
     const metadata = {
-      name: `${channelMetrics.channel_name} Token`,
-      symbol: this.generateTokenSymbol(channelMetrics.channel_name),
-      description: `Social token representing ${channelMetrics.channel_name} YouTube channel`,
-      image: channelMetrics.thumbnail_url,
-      external_url: `https://youtube.com/${channelMetrics.channel_handle}`,
+      name: `${channelMetrics.channelName} Token`,
+      symbol: this.generateTokenSymbol(channelMetrics.channelName),
+      description: `Social token representing ${channelMetrics.channelName} YouTube channel`,
+      image: channelMetrics.thumbnailUrl,
+      external_url: `https://youtube.com/${channelMetrics.channelHandle}`,
       attributes: [
         { trait_type: 'Subscribers', value: channelMetrics.subscribers },
-        { trait_type: 'Total Views', value: channelMetrics.total_views },
-        { trait_type: 'Recent Avg Views', value: channelMetrics.avg_recent_views },
-        { trait_type: 'Recent Avg Likes', value: channelMetrics.avg_recent_likes },
+        { trait_type: 'Total Views', value: channelMetrics.totalViews },
+        { trait_type: 'Recent Avg Views', value: channelMetrics.avgRecentViews },
+        { trait_type: 'Recent Avg Likes', value: channelMetrics.avgRecentLikes },
       ],
     };
 
@@ -275,31 +269,31 @@ class YouTubeTokenFactory {
     const subscriberWeight = 0.5;
     const viewWeight = 0.3;
     const engagementWeight = 0.2;
-    
+
     // Normalize subscriber count (log scale for better distribution)
     const subScore = Math.log10(Math.max(channelMetrics.subscribers, 1)) / 7; // Max at 10M subs = ~1
-    
+
     // Normalize view score
     const viewScore = Math.log10(Math.max(channelMetrics.avgRecentViews, 1)) / 6; // Max at 1M views = ~1
-    
+
     // Calculate engagement rate
     const engagementRate = channelMetrics.avgRecentViews > 0
       ? channelMetrics.avgRecentLikes / channelMetrics.avgRecentViews
       : 0;
     const engagementScore = Math.min(engagementRate * 10, 1); // Cap at 1
-    
+
     // Calculate composite score (0-1 range)
     const compositeScore = (
       subscriberWeight * subScore +
       viewWeight * viewScore +
       engagementWeight * engagementScore
     );
-    
+
     // Price range: 0.0001 SOL to 1 SOL
     // At ₹14k/SOL: ₹1.4 to ₹14,000 per token
     const minPrice = 0.0001; // ₹1.4
     const maxPrice = 1.0;    // ₹14,000
-    
+
     const price = minPrice + (compositeScore * (maxPrice - minPrice));
     console.log("TOKEN PRICE, ", price);
     return Math.round(price * 1000000) / 1000000; // 6 decimal places
@@ -312,19 +306,19 @@ class YouTubeTokenFactory {
     // Base supply scales with log of subscribers for better distribution
     const logSubs = Math.log10(Math.max(channelMetrics.subscribers, 1000));
     const baseSupply = Math.floor(50000 * Math.pow(logSubs, 1.5));
-    
+
     // Engagement modifier (smaller impact)
     const engagementRate = channelMetrics.avgRecentViews > 0
       ? channelMetrics.avgRecentLikes / channelMetrics.avgRecentViews
       : 0;
     const engagementModifier = 1 + Math.min(engagementRate * 2, 0.3);
-    
+
     const totalSupply = Math.floor(baseSupply * engagementModifier);
-    
+
     // Reasonable supply bounds
     const minSupply = 100000;   // 100K tokens
     const maxSupply = 5000000;  // 5M tokens
-    
+
     return Math.max(Math.min(totalSupply, maxSupply), minSupply);
   }
 
@@ -334,9 +328,9 @@ class YouTubeTokenFactory {
   calculateInitialSol(channelMetrics) {
     const tokenSupply = this.calculateTokenSupply(channelMetrics);
     const tokenPrice = this.calculateInitialPrice(channelMetrics);
-    
+
     let solAmount = tokenSupply * tokenPrice;
-    
+
     return Math.round(solAmount * 1000000) / 1000000;
   }
 }

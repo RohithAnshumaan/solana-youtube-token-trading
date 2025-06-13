@@ -19,7 +19,7 @@ async function main() {
         console.log('✅ Connected to MongoDB');
 
         // 2️⃣ Hardcoded channel name
-        const channelName = 'MoreSidemen'; // adjust to match token saved in DB
+        const channelName = 'PewDiePie'; // adjust to match token saved in DB
 
         // 3️⃣ Fetch token data from DB
         const tokenData = await fetchTokenData(channelName);
