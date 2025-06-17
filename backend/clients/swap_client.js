@@ -17,7 +17,9 @@ import {
     createSyncNativeInstruction,
     getMint,
     NATIVE_MINT,
-    getAssociatedTokenAddress
+    getAssociatedTokenAddress,
+    closeAccount,
+    createCloseAccountInstruction
 } from '@solana/spl-token';
 import BN from 'bn.js';
 import { MongoClient } from 'mongodb';
@@ -29,7 +31,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'youtube_tokens';
 const COLLECTION_NAME = 'tokens';
 
-const PROGRAM_ID = new PublicKey('9pKDtt6qeSmkbYu4Jhh65Gg5EsmcrBwdJFL1fbzFZtVJ');
+const PROGRAM_ID = new PublicKey('H9esR6wDUq9CrivQbz2iX2SLicYUZxXNQ7CDMZoCsvde');
 const RPC_URL = process.env.SOLANA_RPC_URL;
 const connection = new Connection(RPC_URL, 'confirmed');
 const DEFAULT_WALLET_PUBKEY = new PublicKey('4Vd2tqPNX4tQjsQXTz4cAqdrwrSLFhrwjHsKfjo2cvQX');
@@ -89,25 +91,25 @@ class AMMSwapClient {
         this.currentUserEmail = currentUserEmail;
     }
 
-    async ensureSufficientBalance(requiredSol = 1) {
+    async updateUserWsolWallet(user, wsolAccountAddress) {
+        const wsolBalance = await this.connection.getTokenAccountBalance(wsolAccountAddress);
+        const uiAmount = wsolBalance.value.uiAmount || 0;
+
+        // Set fields directly
+        user.wsolWalletPublicKey = wsolAccountAddress.toBase58();
+        user.wsolBalance = uiAmount;
+
+        await user.save();
+    }
+
+
+
+    async ensureSufficientBalance(requiredSol) {
         const currentBalance = await this.connection.getBalance(this.userWallet.publicKey);
         const requiredLamports = requiredSol * LAMPORTS_PER_SOL;
 
         if (currentBalance < requiredLamports) {
-            const neededSol = requiredSol - currentBalance / LAMPORTS_PER_SOL;
-            const neededLamports = Math.ceil(neededSol * LAMPORTS_PER_SOL);  // Round up to avoid floating-point errors
-            console.log(`Requesting airdrop of ${neededSol} SOL (${neededLamports} lamports) to ${this.userWallet.publicKey.toBase58()}`);
-            try {
-                const airdropSignature = await this.connection.requestAirdrop(
-                    this.userWallet.publicKey,
-                    neededLamports
-                );
-                await this.connection.confirmTransaction(airdropSignature);
-                console.log(`Airdrop successful: ${neededSol} SOL received`);
-            } catch (error) {
-                console.error('Airdrop failed:', error);
-                throw new Error(`Failed to airdrop ${neededSol} SOL`);
-            }
+            throw new Error(`Insufficient SOL balance in ${this.userWallet.publicKey}`);
         }
     }
 
@@ -122,9 +124,8 @@ class AMMSwapClient {
         const tokenMint = new PublicKey(poolData.mint_address);
         const wsolMint = NATIVE_MINT;
 
-        await this.ensureSufficientBalance(solAmount + 100);
+        await this.ensureSufficientBalance(solAmount);
 
-        console.log("Ensuring WSOL account...");
         // Create WSOL account for the user
         const userWsolAccount = await getOrCreateAssociatedTokenAccount(
             this.connection,
@@ -135,7 +136,6 @@ class AMMSwapClient {
         );
         console.log(`User WSOL account: ${userWsolAccount.address.toBase58()}`);
 
-        console.log("Ensuring user's token account...");
         // Get or create user's token account for the custom token
         const userTokenAccount = await getOrCreateAssociatedTokenAccount(
             this.connection,
@@ -161,19 +161,30 @@ class AMMSwapClient {
         // Create transaction
         const transaction = new Transaction();
 
-        // Transfer SOL to WSOL account
-        transaction.add(
-            SystemProgram.transfer({
-                fromPubkey: this.userWallet.publicKey,
-                toPubkey: userWsolAccount.address,
-                lamports: solAmountInLamports,
-            })
-        );
+        // Step 1: Get current WSOL balance
+        const wsolBalance = await this.connection.getTokenAccountBalance(userWsolAccount.address);
+        const currentWsolLamports = Number(wsolBalance.value.amount); // string -> number
 
-        // Sync native (convert SOL to WSOL)
-        transaction.add(
-            createSyncNativeInstruction(userWsolAccount.address)
-        );
+        console.log(`Current WSOL balance: ${currentWsolLamports / LAMPORTS_PER_SOL} SOL`);
+
+        // Step 2: Conditionally add transfer + sync only if insufficient
+        if (currentWsolLamports < solAmountInLamports) {
+            const lamportsNeeded = solAmountInLamports - currentWsolLamports;
+            console.log(`WSOL insufficient, transferring ${lamportsNeeded / LAMPORTS_PER_SOL} SOL to WSOL ATA`);
+
+            transaction.add(
+                SystemProgram.transfer({
+                    fromPubkey: this.userWallet.publicKey,
+                    toPubkey: userWsolAccount.address,
+                    lamports: lamportsNeeded,
+                })
+            );
+
+            transaction.add(createSyncNativeInstruction(userWsolAccount.address));
+        } else {
+            console.log("Sufficient WSOL already available, skipping SOL transfer");
+        }
+
 
         // Validate pool PDA
         let poolAccount = poolData.liquidity_pool.pool_account;
@@ -217,6 +228,8 @@ class AMMSwapClient {
         if (expectedPoolSolAccount.toBase58() !== poolData.liquidity_pool.pool_sol_account.toBase58()) {
             console.warn(`Warning: Pool SOL account mismatch. Expected: ${expectedPoolSolAccount.toBase58()}, Got: ${poolData.liquidity_pool.pool_sol_account.toBase58()}`);
         }
+
+        const initialTokenBalance = await this.connection.getTokenAccountBalance(userTokenAccount.address);
 
         // Create swap instruction data
         const swapData = Buffer.alloc(1 + 16);
@@ -264,8 +277,9 @@ class AMMSwapClient {
         const finalTokenBalance = await this.connection.getTokenAccountBalance(userTokenAccount.address);
         const finalSolBalance = await this.connection.getBalance(this.userWallet.publicKey);
 
-        console.log(`Final token balance: ${finalTokenBalance.value.uiAmount}`);
-        console.log(`Final SOL balance: ${finalSolBalance / LAMPORTS_PER_SOL} SOL`);
+        console.log(`Final user token balance: ${finalTokenBalance.value.uiAmount}`);
+        console.log(`Final user SOL balance: ${finalSolBalance / LAMPORTS_PER_SOL} SOL`);
+
 
         const tokenType = poolData.token_symbol; // e.g., MRBEAST
         const tokenTitle = poolData.token_title;
@@ -276,6 +290,8 @@ class AMMSwapClient {
         const tokenSecret = userTokenAccount.secretKey ? Array.from(userTokenAccount.secretKey) : [];
 
         const walletIndex = user.wallets.findIndex(w => w.type === tokenType);
+
+        await this.updateUserWsolWallet(user, userWsolAccount.address);
 
         if (walletIndex >= 0) {
             // Update existing
@@ -301,9 +317,10 @@ class AMMSwapClient {
 
         const swapResult = {
             txSignature,
-            swapType: 'SOL_TO_TOKEN',
+            swapType: 'BUY',
             amountIn: solAmount,
-            amountOut: finalTokenBalance.value.uiAmount,
+            amountOut: finalTokenBalance.value.uiAmount - initialTokenBalance.value.uiAmount,
+            finalBalance: finalTokenBalance.value.uiAmount,
             userWallet: this.userWallet.publicKey.toBase58()
         };
 
@@ -311,10 +328,11 @@ class AMMSwapClient {
     }
 
     async swapTokensForSol(poolData, tokenAmount) {
+
+        const user = await User.findOne({ email: this.currentUserEmail });
+
         const tokenMint = new PublicKey(poolData.mint_address);
         const wsolMint = NATIVE_MINT;
-
-        await this.ensureSufficientBalance(100); // Small buffer for transaction fees
 
         console.log("Ensuring user's token account...");
         // Get user's token account
@@ -408,6 +426,8 @@ class AMMSwapClient {
             console.warn(`Warning: Pool SOL account mismatch. Expected: ${expectedPoolSolAccount.toBase58()}, Got: ${poolData.liquidity_pool.pool_sol_account.toBase58()}`);
         }
 
+        const initialWsolBalance = await this.connection.getTokenAccountBalance(userWsolAccount.address);
+
         // Create swap instruction data
         const swapData = Buffer.alloc(1 + 16);
         swapData.writeUInt8(2, 0); // Instruction index for Token->SOL swap
@@ -456,11 +476,33 @@ class AMMSwapClient {
         console.log(`Final token balance: ${finalTokenBalance.value.uiAmount}`);
         console.log(`Final WSOL balance: ${finalWsolBalance.value.uiAmount}`);
 
+        await this.updateUserWsolWallet(user, userWsolAccount.address);
+
+        console.log("Unwrapping WSOL back to native SOL...");
+
+        const unwrapTx = new Transaction().add(
+            createCloseAccountInstruction(
+                userWsolAccount.address,            // source (WSOL token account)
+                this.userWallet.publicKey,          // destination (refund lamports here)
+                this.userWallet.publicKey,          // authority (must be signer)
+                []                                  // multisigSigners (empty)
+            )
+        );
+
+        const unwrapSignature = await sendAndConfirmTransaction(
+            this.connection,
+            unwrapTx,
+            [this.userWallet]
+        );
+
+        console.log(`WSOL successfully unwrapped. Tx: ${unwrapSignature}`);
+
         const swapResult = {
             txSignature,
-            swapType: 'TOKEN_TO_SOL',
+            swapType: 'SELL',
             amountIn: tokenAmount,
-            amountOut: finalWsolBalance.value.uiAmount,
+            amountOut: finalWsolBalance.value.uiAmount - initialWsolBalance.value.uiAmount,
+            finalBalance: finalWsolBalance.value.uiAmount,
             userWallet: this.userWallet.publicKey.toBase58()
         };
 

@@ -14,18 +14,36 @@ const userSchema = new mongoose.Schema({
   googleId: { type: String, required: true },
   displayName: String,
   email: String,
+  
   accessToken: String,
   refreshToken: String,
+  
   solWalletPublicKey: String,
   solWalletSecretKey: String,
   solBalance: Number,
+
+  wsolWalletPublicKey: String,
+  wsolBalance: Number,
+
   wallets: [walletSchema],
+  
   depositHistory: [{
     amount: { type: Number, required: true },
     signature: { type: String, required: true },
     balanceAfter: { type: Number, required: true },
     timestamp: { type: Date, default: Date.now },
   }],
+  
+  swapHistory: [{
+    transaction_signature: String,
+    swap_type: String,
+    amount_in: Number,
+    amount_out: Number,
+    final_balance: Number,
+    token: String,
+    timestamp: { type: Date, default: Date.now },
+  }],
+  
   createdTokens: [
     {
       token_symbol: String,
@@ -36,9 +54,10 @@ const userSchema = new mongoose.Schema({
       pool_sol: Number,
       market_cap: Number,
       created_at: { type: Date, default: Date.now }
-    }
+  }
   ],
-channelInfo: [
+  
+  channelInfo: [
     {
       avgRecentLikes: Number,
       avgRecentViews: Number,

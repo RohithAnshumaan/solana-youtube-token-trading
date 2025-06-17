@@ -262,7 +262,6 @@ pub fn process_instruction(
             msg!("Liquidity added: {} A, {} B", amount_a, amount_b);
         }
 
-        // Fixed Swap Logic
         2 | 3 => {
             let is_token_to_sol = instruction_data[0] == 2;
             let amount_in: u128 = u128::from_le_bytes(
@@ -285,12 +284,7 @@ pub fn process_instruction(
                 program_id,
             );
 
-            let fee_numerator = 997;
-            let fee_denominator = 1000;
-            let amount_in_with_fee = amount_in
-                .checked_mul(fee_numerator)
-                .and_then(|x| x.checked_div(fee_denominator))
-                .ok_or(ProgramError::Custom(1001))?;
+            let amount_in_with_fee = amount_in; 
 
             let amount_in_u64: u64 = amount_in
                 .try_into()

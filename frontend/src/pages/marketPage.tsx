@@ -16,7 +16,7 @@ interface PriceHistoryEntry {
 }
 
 interface Token {
-  id: string;
+  _id: string;
   channel_name: string;
   channel_handle: string;
   thumbnail_url: string;
@@ -185,7 +185,7 @@ export default function MarketPage() {
                       </div> */}
 
                       <div className="flex space-x-2">
-                        <Link to={`/token/${token.id}`}>
+                        <Link to={`/token/${token._id.toString()}`}>
                           <Button
                             variant="outline"
                             size="sm"
@@ -194,7 +194,7 @@ export default function MarketPage() {
                             Details
                           </Button>
                         </Link>
-                        <Link to={`/buy-tokens?token=${token.token_symbol}`}>
+                        <Link to={`/buy-tokens?token=${token._id.toString()}`}>
                           <Button
                             size="sm"
                             className="bg-white text-black hover:bg-gray-100 transition-all duration-200 hover-lift btn-press btn-enhanced"

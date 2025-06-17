@@ -3,6 +3,12 @@ import mongoose from 'mongoose';
 const TokenSchema = new mongoose.Schema({
   channel_name: String,
   channel_handle: String,
+  channel_info: {
+    subscribers: Number,
+    total_views: Number,
+    average_views: Number,
+    average_likes: Number
+  },
   thumbnail_url: String,
   token_symbol: String,
   token_title: String,

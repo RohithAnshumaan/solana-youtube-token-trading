@@ -20,7 +20,7 @@ import { config } from 'dotenv';
 
 config({path : "D:/HypeEconomy/backend/.env"});
 
-const PROGRAM_ID = new PublicKey('3ejw4uLZK7wqtUEmmbWDgipFABnL8SsT6qjFEcYvebmU');
+const PROGRAM_ID = new PublicKey('4q4M66k1J3STCQvVok5CiAocjFqnhiUJTj3uDFqkZ3Nh');
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey('metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s');
 
 class YouTubeTokenFactory {

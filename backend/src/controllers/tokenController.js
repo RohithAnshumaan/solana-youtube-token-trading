@@ -23,6 +23,7 @@ async function storeSwapData(swapData, userEmail, tokenSymbol) {
                         swap_type: swapData.swapType,
                         amount_in: swapData.amountIn,
                         amount_out: swapData.amountOut,
+                        final_balance: swapData.finalBalance,
                         token: tokenSymbol,
                         timestamp: new Date()
                     }
@@ -110,7 +111,7 @@ export const createTokenController = async (req, res) => {
     try {
         const googleId = req.user.googleId;
         // Fetch stored channel metrics from the User's channelInfo
-        const user = await User.findOne({googleId});
+        const user = await User.findOne({ googleId });
 
         if (!user || !user.channelInfo || user.channelInfo.length === 0) {
             return res.status(404).json({ error: 'No stored channel metrics found for this channel handle.' });
@@ -140,11 +141,21 @@ export const createTokenController = async (req, res) => {
         const supply = factory.calculateTokenSupply(storedMetrics);
         const initialSol = factory.calculateInitialSol(storedMetrics);
         const marketCap = price * supply;
+        
+        const channel_metrics = result.channelMetrics;
+
+        const channel_info = {
+            subscribers: channel_metrics.subscribers,
+            total_views: channel_metrics.totalViews,
+            average_views: channel_metrics.avgRecentViews,
+            average_likes: channel_metrics.avgRecentLikes,
+        }
 
         // Save to Tokens collection
         await Token.create({
             channel_name: storedMetrics.channelName,
             channel_handle: storedMetrics.channelHandle,
+            channel_info: channel_info,
             thumbnail_url: storedMetrics.thumbnailUrl,
             token_symbol: result.tokenArgs.token_symbol,
             token_title: result.tokenArgs.token_title,
@@ -342,6 +353,21 @@ export const sellTokenController = async (req, res) => {
             message: 'Swap successful',
             swapResult
         });
+    } catch (error) {
+        console.error('Error in sellTokenController:', error);
+        return res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+};
+
+export const getTokenDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const token = await Token.findById(id); // <-- This uses MongoDB _id
+
+        if (!token) return res.status(404).json({ msg: "Token not found" });
+
+        return res.status(200).json(token);
+
     } catch (error) {
         console.error('Error in sellTokenController:', error);
         return res.status(500).json({ error: error.message || 'Internal server error' });

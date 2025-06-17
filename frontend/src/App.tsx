@@ -1,6 +1,5 @@
-// src/App.tsx
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Toaster } from "react-hot-toast"; // Import the Toaster
+import { Toaster } from "sonner";
 import MarketPage from "./pages/marketPage";
 import ProfilePage from "./pages/profilePage";
 import HomePage from "./pages/homePage";
@@ -13,10 +12,7 @@ function App() {
   return (
     <Router>
       <div>
-        {/* Place the Toaster here to show notifications globally */}
-        <Toaster position="top-right" reverseOrder={false} />
-
-        {/* Routes */}
+        <Toaster richColors position="top-center" />
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/deposit" element={<DepositPage />} />

@@ -7,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Wallet, Mail, TrendingUp, ArrowUpRight, ArrowDownLeft } from "lucide-react"
+import { Wallet, Mail, TrendingUp, ArrowDownLeft } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { io, Socket } from "socket.io-client";
 
 interface walletInterface {
   type: string
@@ -18,6 +19,16 @@ interface walletInterface {
   title: string,
   price: number,
   url: string,
+}
+
+interface SwapEntry {
+  transaction_signature: string
+  swap_type: string
+  amount_in: number
+  amount_out: number
+  final_balance?: number
+  timestamp?: string
+  token: string
 }
 
 interface User {
@@ -56,21 +67,49 @@ interface User {
     totalVideos: number
     totalViews: number
   }[]
+  swapHistory: SwapEntry[]
 }
+
+let socket: Socket;
 
 export default function ProfilePage() {
   const [user, setUser] = useState<User | null>(null)
   const navigate = useNavigate();
 
-
   useEffect(() => {
     const getProfile = async () => {
-      const response = await axios.get<{ user: User }>("http://localhost:8080/api/profile", { withCredentials: true })
-      console.log(response.data.user);
-      setUser(response.data.user)
-    }
-    getProfile()
-  }, [])
+      const response = await axios.get<{ user: User }>("http://localhost:8080/api/profile", { withCredentials: true });
+      setUser(response.data.user);
+
+      // ✅ Connect to WebSocket
+      socket = io("http://localhost:8080", { withCredentials: true });
+
+      socket.on("wallet_balance_update", (data) => {
+        setUser((prev) => {
+          if (!prev) return prev;
+          return { ...prev, solBalance: data.solBalance };
+        });
+      });
+
+      socket.on("token_wallet_balance_update", (data) => {
+        setUser((prev) => {
+          if (!prev) return prev;
+          const updatedWallets = prev.wallets.map((w) =>
+            w.address === data.tokenAddress
+              ? { ...w, balance: data.updatedBalance }
+              : w
+          );
+          return { ...prev, wallets: updatedWallets };
+        });
+      });
+    };
+
+    getProfile();
+
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, []);
 
   if (!user) {
     return (
@@ -80,27 +119,10 @@ export default function ProfilePage() {
     );
   }
 
-  const transactions = [
-    {
-      type: "buy",
-      token: "MRBST",
-      amount: 100,
-      total: 1200,
-      date: "2025-06-12",
-      status: "confirmed",
-    },
-    {
-      type: "deposit",
-      token: "SOL",
-      amount: 2,
-      total: 300,
-      date: "2025-06-11",
-      status: "confirmed",
-    },
-  ]
+  const totalPortfolioValue =
+    user.wallets.reduce((sum, holding) => sum + holding.balance * holding.price, 0) +
+    (user.solBalance ?? 0) * 14000;
 
-  // const totalPortfolioValue =
-  //   (holdings?.reduce((sum, holding) => sum + holding.value, 0) || 0) + (user?.solBalance || 0) * 85.5
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -160,11 +182,11 @@ export default function ProfilePage() {
               <CardHeader><CardTitle className="text-white">Portfolio Value</CardTitle></CardHeader>
               <CardContent>
                 <div className="text-center">
-                  {/* <div className="text-3xl font-bold text-white mb-2">${totalPortfolioValue.toFixed(2)}</div> */}
+                  <div className="text-3xl font-bold text-white mb-2">₹{totalPortfolioValue.toFixed(2)}</div>
                   <div className="text-gray-400 mb-2">Total Portfolio</div>
-                  <div className="text-green-400 flex items-center justify-center">
+                  {/* <div className="text-green-400 flex items-center justify-center">
                     <TrendingUp className="h-4 w-4 mr-1" /> +8.5% (24h)
-                  </div>
+                  </div> */}
                 </div>
               </CardContent>
             </Card>
@@ -224,7 +246,7 @@ export default function ProfilePage() {
                     </div>
                     <div className="text-right">
                       <div className="text-white font-semibold">{holding.balance} tokens</div>
-                      <div className="text-gray-400">${(holding.balance * holding.price).toFixed(2)}</div>
+                      <div className="text-gray-400">Value: ${(holding.balance * holding.price).toFixed(2)}</div>
                       {/* <div className={`text-sm flex items-center ${holding.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
                         {holding.change24h >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
                         {holding.change24h >= 0 ? "+" : ""}{holding.change24h.toFixed(2)}%
@@ -236,39 +258,50 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Transactions */}
+          {/* Swap History */}
           <Card className="backdrop-blur-glass border-gray-800/50">
-            <CardHeader><CardTitle className="text-white">Transaction History</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-white">Swap History</CardTitle>
+            </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {transactions.map((tx, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className={`p-2 rounded-full ${tx.type === "buy" ? "bg-green-900" : tx.type === "sell" ? "bg-red-900" : "bg-blue-900"}`}>
-                        {tx.type === "buy" ? <ArrowDownLeft className="h-4 w-4 text-green-400" />
-                          : tx.type === "sell" ? <ArrowUpRight className="h-4 w-4 text-red-400" />
-                            : <Wallet className="h-4 w-4 text-blue-400" />}
+              {user.swapHistory?.length ? (
+                <div className="space-y-4">
+                  {[...user.swapHistory]
+                    .sort((a, b) => new Date(b.timestamp || "").getTime() - new Date(a.timestamp || "").getTime())
+                    .map((tx, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
+                        <div className="flex items-center space-x-4">
+                          <div className={`p-2 rounded-full ${tx.swap_type === "BUY" ? "bg-green-900" : "bg-blue-900"}`}>
+                            {tx.swap_type === "BUY"
+                              ? <ArrowDownLeft className="h-4 w-4 text-green-400" />
+                              : <TrendingUp className="h-4 w-4 text-blue-400" />}
+                          </div>
+                          <div>
+                            <div className="text-white font-semibold capitalize">
+                              {tx.swap_type.replace(/_/g, " ")} {tx.token}
+                            </div>
+                            <div className="text-gray-400 text-sm">
+                              {tx.timestamp ? new Date(tx.timestamp).toLocaleString() : "No timestamp"}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-white font-semibold">
+                            {tx.amount_in} SOL → {tx.amount_out.toFixed(3)} {tx.token}
+                          </div>
+                          <div className="text-xs text-white">
+                            Balance: {tx.final_balance?.toFixed(4) ?? "N/A"}
+                          </div>
+                          <div className="text-xs text-white break-all">
+                            <span className="font-mono">{tx.transaction_signature.slice(0, 12)}...</span>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <div className="text-white font-semibold capitalize">{tx.type} {tx.token}</div>
-                        <div className="text-gray-400 text-sm">{tx.date}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-white font-semibold">
-                        {tx.type === "deposit" ? "+" : ""}{tx.amount} {tx.token}
-                      </div>
-                      <div className="text-gray-400 text-sm">${tx.total.toFixed(2)}</div>
-                      <Badge variant="secondary" className="bg-green-900 text-green-400 text-xs">{tx.status}</Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="text-center mt-6">
-                <Button variant="outline" className="border-gray-600 text-gray-300 hover:bg-gray-800">
-                  View All Transactions
-                </Button>
-              </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-400">No swap transactions yet.</div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -4,88 +4,77 @@ import User from '../src/models/userModel.js';
 
 const connection = new Connection("http://127.0.0.1:8899", 'confirmed');
 
-
 export async function startWebSocketListeners(io) {
-
   const tokens = await Token.find({}).lean();
   console.log(`📡 Setting up WebSocket listeners for ${tokens.length} tokens`);
 
   const users = await User.find({}).lean();
   console.log(`👥 Setting up listeners for ${users.length} user wallets`);
 
-
   for (const user of users) {
-    if (!user.wallets || user.wallets.length === 0) continue;
-    if (!user.solWalletPublicKey) continue;
+    if (!user.wallets?.length || !user.solWalletPublicKey) continue;
 
     const userWallet = new PublicKey(user.solWalletPublicKey);
-    const userId = user.googleId.toString(); // Or however you're tracking them
-    
-    for (let i = 0; i < user.wallets.length; i++) {
-    const wallet = user.wallets[i];
-    const tokenAddress = new PublicKey(wallet.address);
+    const userId = user.googleId.toString();
 
-    // Set up listener for each token wallet
-    connection.onAccountChange(tokenAddress, async (accountInfo) => {
-      try {
-        const rawBalance = accountInfo.data.slice(64, 72); // token amount starts at offset 64
-        const updatedBalance = Number(rawBalance.readBigUInt64LE()) / 1e9; // assuming DECIMALS = 9
+    for (const wallet of user.wallets) {
+      const tokenAddress = new PublicKey(wallet.address);
 
-        const freshUser = await User.findOne({ googleId: user.googleId });
-        if (!freshUser) return;
+      connection.onAccountChange(tokenAddress, async (accountInfo) => {
+        try {
+          const rawBalance = accountInfo.data.slice(64, 72); // token balance offset
+          const updatedBalance = Number(rawBalance.readBigUInt64LE()) / 1e9;
 
-        const index = freshUser.wallets.findIndex(w => w.address === wallet.address);
-        if (index === -1) return;
+          const freshUser = await User.findOne({ googleId: userId });
+          if (!freshUser) return;
 
-        const storedBalance = freshUser.wallets[index].balance;
+          const index = freshUser.wallets.findIndex(w => w.address === wallet.address);
+          if (index === -1) return;
 
-        // Update only if balance changed
-        if (storedBalance !== updatedBalance) {
-          freshUser.wallets[index].balance = updatedBalance;
-          await freshUser.save();
+          const storedBalance = freshUser.wallets[index].balance;
+          if (storedBalance !== updatedBalance) {
+            freshUser.wallets[index].balance = updatedBalance;
+            await freshUser.save();
 
-          console.log(`🔄 Updated wallet balance for ${user.googleId} (${wallet.type}): ${updatedBalance}`);
-
-          io.to(user.googleId.toString()).emit("token_wallet_balance_update", {
-            tokenType: wallet.type,
-            tokenAddress: wallet.address,
-            updatedBalance,
-            timestamp: new Date(),
-          });
+            console.log(`🔄 Updated ${wallet.type} balance for ${userId}: ${updatedBalance}`);
+            io.to(userId).emit("token_wallet_balance_update", {
+              tokenType: wallet.type,
+              tokenAddress: wallet.address,
+              updatedBalance,
+              timestamp: new Date(),
+            });
+          }
+        } catch (err) {
+          console.error(`❌ Balance listener error for ${wallet.type} (${wallet.address}):`, err.message);
         }
-      } catch (err) {
-        console.error(`❌ Error tracking balance for ${wallet.type} (${wallet.address}):`, err.message);
-      }
-    });
-  }
+      });
+    }
 
+    // SOL Wallet Listener
     connection.onAccountChange(userWallet, async (accountInfo) => {
       try {
         const solBalance = accountInfo.lamports / 1e9;
 
-        // Optionally update in DB:
         await User.updateOne({ googleId: userId }, { solBalance });
+        
+        console.log("Balance updated to : ", solBalance );
 
-        const wallets =
+        io.to(userId).emit("wallet_balance_update", {
+          userId,
+          solBalance,
+          timestamp: new Date(),
+        });
 
-          // Emit update via socket
-          io.to(userId).emit("wallet_balance_update", {
-            userId,
-            solBalance,
-            timestamp: new Date(),
-          });
-
-        console.log(`💸 Balance update for ${userId}: ${solBalance} SOL`);
-
+        console.log(`💸 SOL balance update for ${userId}: ${solBalance}`);
       } catch (err) {
-        console.error(`❌ Wallet listener error for user ${userId}:`, err.message);
+        console.error(`❌ SOL wallet listener error for user ${userId}:`, err.message);
       }
     });
   }
 
   for (const token of tokens) {
     if (!token.liquidity_pool) {
-      console.warn(`❗ Token ${token.token_symbol} is missing liquidity_pool`);
+      console.warn(`❗ Token ${token.token_symbol} missing liquidity_pool`);
       continue;
     }
 
@@ -93,13 +82,12 @@ export async function startWebSocketListeners(io) {
     const tokenAccount = new PublicKey(token.liquidity_pool.pool_token_account);
     const mintAddress = token.mint_address;
     const symbol = token.token_symbol;
-
     const DECIMALS = 9;
 
-    // --- SOL Account Listener ---
+    // --- SOL Pool Account Listener ---
     connection.onAccountChange(solAccount, async (accountInfo) => {
       try {
-        const sol = accountInfo.lamports / 1e9; // Convert lamports to SOL
+        const sol = accountInfo.lamports / 1e9;
 
         const updated = await Token.findOne({ mint_address: mintAddress });
         if (!updated) return;
@@ -107,7 +95,6 @@ export async function startWebSocketListeners(io) {
         updated.pool_sol = sol;
 
         if (updated.pool_supply && updated.pool_supply > 0) {
-          // Recalculate price in SOL/token
           updated.price = sol / updated.pool_supply;
           updated.market_cap = updated.price * updated.pool_supply;
           updated.price_history.push({ price: updated.price, timestamp: new Date() });
@@ -123,19 +110,16 @@ export async function startWebSocketListeners(io) {
           market_cap: updated.market_cap,
           timestamp: new Date()
         });
-
       } catch (err) {
         console.error(`❌ SOL listener error for ${symbol}:`, err.message);
       }
     });
 
-    // --- SPL Token Account Listener ---
+    // --- SPL Token Pool Account Listener ---
     connection.onAccountChange(tokenAccount, async (accountInfo) => {
       try {
-        const data = accountInfo.data;
-        const supplyBuffer = data.slice(64, 72); // SPL token amount starts at offset 64
+        const supplyBuffer = accountInfo.data.slice(64, 72);
         const rawAmount = Number(supplyBuffer.readBigUInt64LE());
-
         const tokenAmount = rawAmount / Math.pow(10, DECIMALS);
 
         const updated = await Token.findOne({ mint_address: mintAddress });
@@ -145,7 +129,7 @@ export async function startWebSocketListeners(io) {
 
         if (updated.pool_sol && updated.pool_sol > 0) {
           updated.price = updated.pool_sol / tokenAmount;
-          updated.market_cap = updated.price * updated.pool_supply;
+          updated.market_cap = updated.price * tokenAmount;
           updated.price_history.push({ price: updated.price, timestamp: new Date() });
         }
 
@@ -159,7 +143,6 @@ export async function startWebSocketListeners(io) {
           market_cap: updated.market_cap,
           timestamp: new Date()
         });
-
       } catch (err) {
         console.error(`❌ Token listener error for ${symbol}:`, err.message);
       }

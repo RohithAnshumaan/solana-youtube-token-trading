@@ -42,7 +42,6 @@ interface Token {
 }
 
 export default function BuyTokensPage() {
-  const [sellToken] = useState("SOL")
   const [buyToken, setBuyToken] = useState("")
   const [sellAmount, setSellAmount] = useState("")
   const [buyAmount, setBuyAmount] = useState("")
@@ -88,6 +87,24 @@ export default function BuyTokensPage() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!buyToken || !sellAmount || isNaN(Number(sellAmount))) {
+      setBuyAmount("");
+      return;
+    }
+
+    const selectedToken = allTokens.find(t => t.token_symbol === buyToken);
+    if (!selectedToken || !selectedToken.price) {
+      setBuyAmount("");
+      return;
+    }
+
+    const sol = parseFloat(sellAmount);
+    const estimatedTokens = sol / selectedToken.price;
+    setBuyAmount(estimatedTokens.toFixed(2));
+  }, [buyToken, sellAmount, allTokens]);
+
+
 
   const handleBuyToken = async () => {
     if (!sellAmount || parseFloat(sellAmount) <= 0) {
@@ -103,7 +120,7 @@ export default function BuyTokensPage() {
         return
       }
 
-      const response = await axios.post(
+      const result = await axios.post(
         `http://localhost:8080/api/token/buy`, // hit buyTokenController directly
         {
           solAmount: parseFloat(sellAmount),
@@ -112,7 +129,13 @@ export default function BuyTokensPage() {
         { withCredentials: true }
       )
 
-      setBuyAmount(response.data.swapResult.amountOut.toFixed(2))
+      toast.success("Swap complete", {
+        description: `Successfully bought ${result.data.swapResult.amountIn} ${selectedToken.token_symbol}`,
+      });
+
+
+      const estimatedTokens = parseFloat(sellAmount) / selectedToken.price;
+      setBuyAmount(estimatedTokens.toFixed(2));
     } catch (error: any) {
       console.error("Error during swap:", error)
       const errorMessage = error.response?.data?.error || "Swap failed."
@@ -121,10 +144,10 @@ export default function BuyTokensPage() {
   }
 
   const topTokens = useMemo(() => {
-  return [...allTokens]
-    .sort((a, b) => b.market_cap - a.market_cap)
-    .slice(0, 5);
-}, [allTokens]);
+    return [...allTokens]
+      .sort((a, b) => b.market_cap - a.market_cap)
+      .slice(0, 5);
+  }, [allTokens]);
 
 
   return (
@@ -218,12 +241,16 @@ export default function BuyTokensPage() {
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Exchange Rate</span>
                       <span className="text-white">
-                        {sellAmount} {sellToken} = ~ {buyToken ? buyAmount : "?"} {buyToken}
+                        {sellAmount} SOL = ~ {buyAmount} {buyToken}
                       </span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Trading Fee</span>
-                      <span className="text-white">0.3%</span>
+                      <span className="text-gray-400">Transaction Fee</span>
+                      <span className="text-white">0.000005 SOL</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">YouTuber royalty</span>
+                      <span className="text-white">0.15%</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-400">Slippage</span>

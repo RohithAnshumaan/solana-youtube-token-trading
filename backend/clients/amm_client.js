@@ -25,7 +25,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const DB_NAME = 'youtube_tokens';
 const COLLECTION_NAME = 'tokens';
 
-const PROGRAM_ID = new PublicKey('9pKDtt6qeSmkbYu4Jhh65Gg5EsmcrBwdJFL1fbzFZtVJ');
+const PROGRAM_ID = new PublicKey('H9esR6wDUq9CrivQbz2iX2SLicYUZxXNQ7CDMZoCsvde');
 const RPC_URL = 'http://127.0.0.1:8899';
 const connection = new Connection(RPC_URL, 'confirmed');
 const DEFAULT_WALLET_PUBKEY = new PublicKey('4Vd2tqPNX4tQjsQXTz4cAqdrwrSLFhrwjHsKfjo2cvQX');

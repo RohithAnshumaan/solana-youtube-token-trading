@@ -21,7 +21,7 @@ async function main() {
     // For demonstration, let's generate a fresh keypair and print it (save for reuse)
     const payer = Keypair.generate();
     console.log('🗝️  Payer Public Key:', payer.publicKey.toBase58());
-      
+
     // 3️⃣ Airdrop SOL to the payer
     const airdropSignature = await connection.requestAirdrop(payer.publicKey, 2 * LAMPORTS_PER_SOL);
     await connection.confirmTransaction(airdropSignature, 'confirmed');
@@ -46,13 +46,22 @@ async function main() {
     const poolSupply = factory.calculateTokenSupply(result.channelMetrics);
     const poolSol = factory.calculateInitialSol(result.channelMetrics);
     const marketCap = price * poolSupply;
-    
+
     console.log(result);
+
+
+    const channel_info = {
+      subscribers: result.channelMetrics.subscribers,
+      total_views: result.channelMetrics.totalViews,
+      average_views: result.channelMetrics.avgRecentViews,
+      average_likes: result.channelMetrics.avgRecentLikes,
+    }
 
     // 8️⃣ Save to MongoDB
     const newToken = new Token({
       channel_name: result.channelMetrics.channelName,
       channel_handle: result.channelMetrics.channelHandle,
+      channel_info: channel_info,
       thumbnail_url: result.channelMetrics.thumbnailUrl,
       token_symbol: result.tokenArgs.token_symbol,
       token_title: result.tokenArgs.token_title,
