@@ -5,15 +5,6 @@ import { verifyToken } from "../middlewares/authMiddleware.js";
 
 const authRouter = express.Router();
 
-// authRouter.get("/google", (req, res, next) => {
-//     console.log("Initiating Google OAuth");
-//     next();
-// }, passport.authenticate("google", {
-//     scope: ["profile", "email", "https://www.googleapis.com/auth/youtube.readonly"], accessType: 'offline',
-//     prompt: 'consent'
-// }));
-// 
-
 authRouter.get('/google', passport.authenticate('google', { scope: ['profile', 'email', "https://www.googleapis.com/auth/youtube.readonly"] }));
 authRouter.get(
     '/google/callback',
@@ -28,13 +19,29 @@ authRouter.get('/failure', loginFailure);
 authRouter.get('/logout', logout);
 authRouter.get('/isLoggedIn', verifyToken, isLoggedIn)
 
-// authRouter.get(
-//     "/google/callback",
-//     passport.authenticate("google", { session: false, failureRedirect: "/auth/login-failure" }),
-//     googleCallback
-// );
+authRouter.get('/session', verifyToken, (req, res) => {
+    const user = req.user;
+    if (!user) {
+        return res.status(401).json({ message: "Not authenticated" });
+    }
 
-// // Optional: Login failure
-// authRouter.get("/login-failure", loginFailure);
+    const {
+        googleId,
+        displayName,
+        email,
+        solWalletPublicKey,
+        solWalletSecretKey,
+        solBalance,
+    } = user;
+
+    res.json({
+        googleId,
+        displayName,
+        email,
+        solWalletPublicKey,
+        solWalletSecretKey,
+        solBalance,
+    });
+});
 
 export default authRouter;

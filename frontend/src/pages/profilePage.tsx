@@ -200,9 +200,18 @@ export default function ProfilePage() {
                 <div className="space-y-4">
                   {user.createdTokens.map((token, index) => (
                     <div key={index} className="flex items-center justify-between p-4 bg-gray-800 rounded-lg">
-                      <div>
-                        <div className="text-white font-semibold">{token.token_title}</div>
-                        <Badge variant="secondary" className="bg-gray-700 text-gray-300">{token.token_symbol}</Badge>
+                      <div className="flex items-center space-x-4">
+                        <img
+                          src={token.thumbnail_url}
+                          alt={token.token_title}
+                          width={50}
+                          height={50}
+                          className="rounded-full transition-transform duration-200"
+                        />
+                        <div>
+                          <div className="text-white font-semibold">{token.token_title}</div>
+                          <Badge variant="secondary" className="bg-gray-700 text-gray-300">{token.token_symbol}</Badge>
+                        </div>
                       </div>
                       <div className="text-right">
                         <div className="text-white font-semibold">${token.pool_sol.toFixed(2)}</div>
@@ -247,10 +256,6 @@ export default function ProfilePage() {
                     <div className="text-right">
                       <div className="text-white font-semibold">{holding.balance} tokens</div>
                       <div className="text-gray-400">Value: ${(holding.balance * holding.price).toFixed(2)}</div>
-                      {/* <div className={`text-sm flex items-center ${holding.change24h >= 0 ? "text-green-400" : "text-red-400"}`}>
-                        {holding.change24h >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
-                        {holding.change24h >= 0 ? "+" : ""}{holding.change24h.toFixed(2)}%
-                      </div> */}
                     </div>
                   </div>
                 ))}

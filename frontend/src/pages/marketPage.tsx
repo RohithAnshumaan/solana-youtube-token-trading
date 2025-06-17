@@ -112,14 +112,6 @@ export default function MarketPage() {
                 >
                   Price
                 </Button>
-                <Button
-                  variant={sortBy === "change24h" ? "default" : "outline"}
-                  onClick={() => setSortBy("change24h")}
-                  className={`transition-all duration-200 hover-lift btn-press ${sortBy === "change24h" ? "bg-white text-black" : "bg-gray-800 border-gray-700 text-gray-300"
-                    }`}
-                >
-                  24h Change
-                </Button>
               </div>
             </div>
           </div>
@@ -167,29 +159,12 @@ export default function MarketPage() {
                         <div className="text-lg font-semibold text-white">${(token.market_cap / 1000).toFixed(0)}K</div>
                         <div className="text-sm text-gray-400">Market Cap</div>
                       </div>
-
-                      {/* <div className="text-right hover-scale">
-                        <div
-                          className={`text-lg font-semibold flex items-center transition-all duration-200 ${token.change24h >= 0 ? "text-green-400" : "text-red-400"
-                            }`}
-                        >
-                          {token.change24h >= 0 ? (
-                            <TrendingUp className="h-4 w-4 mr-1 icon-hover" />
-                          ) : (
-                            <TrendingDown className="h-4 w-4 mr-1 icon-hover" />
-                          )}
-                          {token.change24h >= 0 ? "+" : ""}
-                          {token.change24h.toFixed(2)}%
-                        </div>
-                        <div className="text-sm text-gray-400">24h Change</div>
-                      </div> */}
-
                       <div className="flex space-x-2">
                         <Link to={`/token/${token._id.toString()}`}>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="border-gray-600 text-black hover:bg-gray-700 transition-all duration-200 hover-lift btn-press"
+                            className="border-gray-600 text-black hover:bg-white/50 transition-all duration-200 hover-lift btn-press"
                           >
                             Details
                           </Button>
@@ -197,7 +172,7 @@ export default function MarketPage() {
                         <Link to={`/buy-tokens?token=${token._id.toString()}`}>
                           <Button
                             size="sm"
-                            className="bg-white text-black hover:bg-gray-100 transition-all duration-200 hover-lift btn-press btn-enhanced"
+                            className="bg-white text-black hover:bg-white/50 transition-all duration-200 hover-lift btn-press btn-enhanced"
                           >
                             Trade
                           </Button>

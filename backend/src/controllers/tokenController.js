@@ -110,7 +110,7 @@ export const fetchYoutubeChannelData = async (req, res) => {
 export const createTokenController = async (req, res) => {
     try {
         const googleId = req.user.googleId;
-        // Fetch stored channel metrics from the User's channelInfo
+        const { creator_wallet } = req.body;
         const user = await User.findOne({ googleId });
 
         if (!user || !user.channelInfo || user.channelInfo.length === 0) {
@@ -141,7 +141,7 @@ export const createTokenController = async (req, res) => {
         const supply = factory.calculateTokenSupply(storedMetrics);
         const initialSol = factory.calculateInitialSol(storedMetrics);
         const marketCap = price * supply;
-        
+
         const channel_metrics = result.channelMetrics;
 
         const channel_info = {
@@ -153,6 +153,7 @@ export const createTokenController = async (req, res) => {
 
         // Save to Tokens collection
         await Token.create({
+            creator_wallet: creator_wallet || "N/A",
             channel_name: storedMetrics.channelName,
             channel_handle: storedMetrics.channelHandle,
             channel_info: channel_info,
@@ -178,6 +179,7 @@ export const createTokenController = async (req, res) => {
             {
                 $push: {
                     createdTokens: {
+                        thumbnail_url: storedMetrics.thumbnailUrl,
                         mint_address: result.mint,
                         token_symbol: result.tokenArgs.token_symbol,
                         token_title: result.tokenArgs.token_title,
@@ -371,5 +373,38 @@ export const getTokenDetails = async (req, res) => {
     } catch (error) {
         console.error('Error in sellTokenController:', error);
         return res.status(500).json({ error: error.message || 'Internal server error' });
+    }
+};
+
+export const fetchTokenomics = async (req, res) => {
+    try {
+        const user = req.user;
+        const channelHandle = req.body.channelHandle;
+        const connection = new Connection(RPC_URL, 'confirmed');
+        const factory = new YouTubeTokenFactory(connection, user);
+
+        const channelMetrics = await factory.fetchChannelMetrics(channelHandle);
+
+        const token_symbol = factory.generateTokenSymbol(channelMetrics.channelName);
+        const token_title = `${channelMetrics.channelName} Token`;
+        const initial_price = factory.calculateInitialPrice(channelMetrics);
+        const pool_supply = factory.calculateTokenSupply(channelMetrics);
+        const pool_sol = factory.calculateInitialSol(channelMetrics);
+        const market_cap = Math.round(initial_price * pool_supply * 1000000) / 1000000;
+
+        res.json({
+            message: "Token details",
+            data: {
+                token_symbol,
+                token_title,
+                initial_price,
+                pool_supply,
+                pool_sol,
+                market_cap
+            },
+        });
+    } catch (error) {
+        console.error("Simulation failed:", error);
+        res.status(500).json({ message: "Simulation failed" });
     }
 };

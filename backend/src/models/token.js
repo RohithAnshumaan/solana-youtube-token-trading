@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 const TokenSchema = new mongoose.Schema({
+  creator_wallet: String,
   channel_name: String,
   channel_handle: String,
   channel_info: {

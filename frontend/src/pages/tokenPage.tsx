@@ -45,46 +45,48 @@ interface Token {
   price_history: PriceHistoryEntry[];
 }
 
-function formatPriceHistory(history: PriceHistoryEntry[], range: "1Min" | "1H" | "1D" | "7D" | "1M" | "1Y") {
+function formatPriceHistory(
+  history: PriceHistoryEntry[],
+  range: "1H" | "1D" | "7D" | "1M" | "1Y"
+) {
   const now = new Date();
   let cutoff: Date;
+  let timeFormatter: Intl.DateTimeFormatOptions;
 
   switch (range) {
-    case "1Min":
-      cutoff = new Date(now.getTime() - 10 * 60 * 1000); // last 10 minutes
-      break;
     case "1H":
       cutoff = new Date(now.getTime() - 60 * 60 * 1000); // last 1 hour
+      timeFormatter = { hour: "2-digit", minute: "2-digit" };
       break;
     case "1D":
-      cutoff = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
+      cutoff = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+      timeFormatter = { hour: "2-digit" };
       break;
     case "7D":
       cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      timeFormatter = { weekday: "short" };
       break;
     case "1M":
       cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      timeFormatter = { month: "short", day: "numeric" };
       break;
     case "1Y":
       cutoff = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+      timeFormatter = { month: "short" };
       break;
   }
 
   return history
     .filter(entry => new Date(entry.timestamp) >= cutoff)
     .map(entry => ({
-      time: new Date(entry.timestamp).toLocaleTimeString(undefined, {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
+      time: new Date(entry.timestamp).toLocaleTimeString(undefined, timeFormatter),
       price: entry.price,
     }));
 }
 
-
 export default function TokenPage() {
   const { id } = useParams();
-  const [selectedRange, setSelectedRange] = useState<"1Min" | "1H" | "1D" | "7D" | "1M" | "1Y">("7D")
+  const [selectedRange, setSelectedRange] = useState<"1H" | "1D" | "7D" | "1M" | "1Y">("7D")
   const [token, setToken] = useState<Token | null>(null);
   const [tokenAmount, setTokenAmount] = useState<string>("");
   const [isSelling, setIsSelling] = useState(false);
@@ -166,7 +168,7 @@ export default function TokenPage() {
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-white">Price Chart</CardTitle>
                     <div className="flex space-x-2">
-                      {(["1Min", "1H", "1D", "7D", "1M", "1Y"] as const).map(range => (
+                      {(["1H", "1D", "7D", "1M", "1Y"] as const).map(range => (
                         <Button
                           key={range}
                           variant={selectedRange === range ? "default" : "outline"}

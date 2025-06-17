@@ -85,7 +85,7 @@ export default function HomePage() {
                 <Link to="/create-token">
                   <Button
                     size="lg"
-                    className="bg-white text-black hover:bg-gray-100 px-10 py-4 text-lg font-semibold btn-enhanced hover-lift btn-press ripple"
+                    className="bg-white text-black hover:bg-white/50 px-10 py-4 text-lg font-semibold btn-enhanced hover-lift btn-press ripple"
                   >
                     Launch Your Token
                   </Button>
@@ -94,7 +94,7 @@ export default function HomePage() {
                   <Button
                     size="lg"
                     variant="outline"
-                    className="border-gray-600 text-black hover:bg-white/10 backdrop-blur-sm px-10 py-4 text-lg hover-lift btn-press"
+                    className="border-gray-600 text-black hover:bg-white/50 backdrop-blur-sm px-10 py-4 text-lg hover-lift btn-press"
                   >
                     Explore Market
                   </Button>

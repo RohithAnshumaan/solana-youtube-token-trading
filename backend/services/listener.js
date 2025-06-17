@@ -55,8 +55,8 @@ export async function startWebSocketListeners(io) {
       try {
         const solBalance = accountInfo.lamports / 1e9;
 
-        await User.updateOne({ googleId: userId }, { solBalance });
-        
+       await User.updateOne({ googleId: userId }, { $set: { solBalance } });
+
         console.log("Balance updated to : ", solBalance );
 
         io.to(userId).emit("wallet_balance_update", {

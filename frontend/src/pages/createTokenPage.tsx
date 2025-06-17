@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, Eye, Heart, Play, DollarSign, Coins } from "lucide-react"
 import axios from "axios"
 import LiquidityPoolDetails from "@/components/poolDetails"
+import { toast } from "sonner"
+
 
 interface channelData {
   avgRecentLikes: number,
@@ -63,33 +65,68 @@ export default function CreateTokenPage() {
   }, [])
 
   const createAmm = async () => {
-    const response = await axios.post<AMMResponse>("http://localhost:8080/api/token/create-amm", {}, { withCredentials: true });
-    setPoolData(response.data.liquidity_pool);
-    setStep(3);
-  }
-
-  const handleStepTransition = async (newStep: number) => {
-    setIsTransitioning(true);
-
     try {
-      // Make your API call first
-      const getData = await axios.post<channelTokenResponse>(
+      const userResponse = await axios.get("http://localhost:8080/auth/session", {
+        withCredentials: true,
+      });
+      const user = userResponse.data;
+      console.log("User response:", user);
+
+      if (!user.solWalletPublicKey) {
+        toast.error("⚠️ No wallet found. Please deposit first.");
+        return;
+      }
+
+      // 2. Create the Token
+      const tokenResponse = await axios.post<channelTokenResponse>(
         "http://localhost:8080/api/token/create-token",
+        {
+          creator_wallet: user.solWalletPublicKey, 
+        },
+        { withCredentials: true }
+      );
+      const createdToken = tokenResponse.data.data;
+      setToken(createdToken);
+
+      // 3. Create AMM
+      const ammResponse = await axios.post<AMMResponse>(
+        "http://localhost:8080/api/token/create-amm",
         {},
         { withCredentials: true }
       );
-      setToken(getData.data.data);
-      // After the API call completes, give time for the fade-out
-      setTimeout(() => {
-        setStep(newStep);
-        setIsTransitioning(false);
-      }, 300);
-    } catch (error) {
-      console.error("Error creating token:", error);
-      setIsTransitioning(false);
-      // Optionally show a toast or error message
+
+      setPoolData(ammResponse.data.liquidity_pool);
+      setStep(3);
+      toast.success("Token created successfully!");
+    } catch (err) {
+      console.error("Error creating token or AMM:", err);
+      toast.error("Failed to create token or AMM. Please try again.");
     }
   };
+
+
+
+  const handleStepTransition = async (newStep: number) => {
+    setIsTransitioning(true);
+    if (newStep === 2 && data?.channelHandle) {
+    try {
+      const response = await axios.post<channelTokenResponse>(
+        "http://localhost:8080/api/token/tokenomics",
+        { channelHandle: data.channelHandle },
+        { withCredentials: true }
+      );
+      setToken(response.data.data);
+    } catch (error) {
+      console.error("Error simulating token:", error);
+      toast.error("❌ Failed to fetch tokenomics.");
+    }
+  }
+    setTimeout(() => {
+      setStep(newStep);
+      setIsTransitioning(false);
+    }, 300);
+  };
+
 
 
   return (
@@ -231,7 +268,7 @@ export default function CreateTokenPage() {
                           className="rounded-full transition-transform duration-200" />
                       </div>
                       <div className="text-center">
-                        <div className="text-4xl font-bold text-white mb-2">$TECH</div>
+                        <div className="text-4xl font-bold text-white mb-2">{token?.token_symbol}</div>
                         <div className="text-gray-400">Token Symbol</div>
                         <div className="text-xs text-gray-500 mt-1">Generated from channel name</div>
                       </div>
@@ -247,7 +284,7 @@ export default function CreateTokenPage() {
               </div>
             )}
             {step === 3 && poolData && (
-            <LiquidityPoolDetails poolData={poolData} />
+              <LiquidityPoolDetails poolData={poolData} />
             )}
           </div>
         </div>

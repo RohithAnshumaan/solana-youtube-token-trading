@@ -22,9 +22,6 @@ const userSchema = new mongoose.Schema({
   solWalletSecretKey: String,
   solBalance: Number,
 
-  wsolWalletPublicKey: String,
-  wsolBalance: Number,
-
   wallets: [walletSchema],
   
   depositHistory: [{

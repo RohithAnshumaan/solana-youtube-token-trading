@@ -60,7 +60,7 @@ export function Navbar() {
           {/* Right Side */}
           <div className="flex items-center space-x-4">
             <Link to="/create-token">
-              <Button className="bg-white text-black hover:bg-gray-100 font-semibold">Create Token</Button>
+              <Button className="bg-white text-black hover:bg-white/50 font-semibold">Create Token</Button>
             </Link>
 
             {isLoggedIn ? (
@@ -68,7 +68,7 @@ export function Navbar() {
                 <Link to="/deposit">
                   <Button
                     variant="outline"
-                    className="border-gray-700 text-black hover:bg-white/10 backdrop-blur-sm"
+                    className="border-gray-700 text-black hover:bg-white/50 backdrop-blur-sm"
                     onClick={createWallet}
                   >
                     <Wallet className="h-4 w-4 mr-2" />

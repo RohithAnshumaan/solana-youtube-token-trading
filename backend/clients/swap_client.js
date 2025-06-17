@@ -18,13 +18,11 @@ import {
     getMint,
     NATIVE_MINT,
     getAssociatedTokenAddress,
-    closeAccount,
     createCloseAccountInstruction
 } from '@solana/spl-token';
 import BN from 'bn.js';
 import { MongoClient } from 'mongodb';
 import User from '../src/models/userModel.js';
-import mongoose from 'mongoose';
 
 // MongoDB setup
 const MONGO_URI = process.env.MONGO_URI;
@@ -56,6 +54,7 @@ async function fetchTokenAndPoolData(channelName) {
         }
 
         return {
+            creator_wallet: token.creator_wallet,
             token_title: token.token_title,
             token_symbol: token.token_symbol,
             price: token.price,
@@ -90,19 +89,6 @@ class AMMSwapClient {
         this.connection = connection;
         this.currentUserEmail = currentUserEmail;
     }
-
-    async updateUserWsolWallet(user, wsolAccountAddress) {
-        const wsolBalance = await this.connection.getTokenAccountBalance(wsolAccountAddress);
-        const uiAmount = wsolBalance.value.uiAmount || 0;
-
-        // Set fields directly
-        user.wsolWalletPublicKey = wsolAccountAddress.toBase58();
-        user.wsolBalance = uiAmount;
-
-        await user.save();
-    }
-
-
 
     async ensureSufficientBalance(requiredSol) {
         const currentBalance = await this.connection.getBalance(this.userWallet.publicKey);
@@ -155,11 +141,37 @@ class AMMSwapClient {
         }
 
         const solAmountInLamports = Math.floor(solAmount * LAMPORTS_PER_SOL);
+
+        const feeLamports = Math.floor(solAmountInLamports * 0.0015); // 0.15%
+        const amountForSwap = solAmountInLamports - feeLamports;
+
+        if (!poolData.creator_wallet) {
+            throw new Error("Missing creator wallet in pool data.");
+        }
+
+        const creatorPubkey = new PublicKey(poolData.creator_wallet);
+
+        console.log(`Total SOL: ${solAmountInLamports}`);
+        console.log(`→ Fee: ${feeLamports} lamports`);
+        console.log(`→ For swap: ${amountForSwap} lamports`);
+
+
         console.log(`Swapping ${solAmount} SOL for tokens...`);
         console.log(`SOL amount in lamports: ${solAmountInLamports}`);
-
+        
         // Create transaction
         const transaction = new Transaction();
+
+        // Transfer 0.15% fee to creator wallet
+        transaction.add(
+            SystemProgram.transfer({
+                fromPubkey: this.userWallet.publicKey,
+                toPubkey: creatorPubkey,
+                lamports: feeLamports,
+            })
+        );
+        
+        console.log("Successfully sent 0.15% fee to youtuber = ", feeLamports);
 
         // Step 1: Get current WSOL balance
         const wsolBalance = await this.connection.getTokenAccountBalance(userWsolAccount.address);
@@ -169,7 +181,7 @@ class AMMSwapClient {
 
         // Step 2: Conditionally add transfer + sync only if insufficient
         if (currentWsolLamports < solAmountInLamports) {
-            const lamportsNeeded = solAmountInLamports - currentWsolLamports;
+            const lamportsNeeded = amountForSwap - currentWsolLamports;
             console.log(`WSOL insufficient, transferring ${lamportsNeeded / LAMPORTS_PER_SOL} SOL to WSOL ATA`);
 
             transaction.add(
@@ -234,7 +246,7 @@ class AMMSwapClient {
         // Create swap instruction data
         const swapData = Buffer.alloc(1 + 16);
         swapData.writeUInt8(3, 0); // Instruction index for SOL->YT_TOKEN swap
-        new BN(solAmountInLamports.toString()).toArrayLike(Buffer, 'le', 16).copy(swapData, 1);
+        new BN(amountForSwap.toString()).toArrayLike(Buffer, 'le', 16).copy(swapData, 1);
 
         // Swap instruction with all required accounts
         const swapInstruction = new TransactionInstruction({
@@ -290,8 +302,6 @@ class AMMSwapClient {
         const tokenSecret = userTokenAccount.secretKey ? Array.from(userTokenAccount.secretKey) : [];
 
         const walletIndex = user.wallets.findIndex(w => w.type === tokenType);
-
-        await this.updateUserWsolWallet(user, userWsolAccount.address);
 
         if (walletIndex >= 0) {
             // Update existing
@@ -475,8 +485,6 @@ class AMMSwapClient {
 
         console.log(`Final token balance: ${finalTokenBalance.value.uiAmount}`);
         console.log(`Final WSOL balance: ${finalWsolBalance.value.uiAmount}`);
-
-        await this.updateUserWsolWallet(user, userWsolAccount.address);
 
         console.log("Unwrapping WSOL back to native SOL...");
 
